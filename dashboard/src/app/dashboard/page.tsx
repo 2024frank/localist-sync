@@ -53,7 +53,7 @@ export default function OverviewPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label="Total Events on Calendar"
+          label="Total Events Submitted to CH Calendar"
           value={localist ? localist.total.toString() : "—"}
           sub={localist ? "across all runs" : "waiting for first run"}
         />
