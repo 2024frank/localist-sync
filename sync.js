@@ -77,9 +77,18 @@ function toUnix(isoString) {
   return Math.floor(new Date(isoString).getTime() / 1000);
 }
 
-function truncate(str, max) {
+function stripUrls(str) {
   if (!str) return "";
-  return str.length <= max ? str : str.slice(0, max - 1).trimEnd() + "…";
+  return str.replace(/https?:\/\/\S+/g, "").replace(/\s{2,}/g, " ").trim();
+}
+
+function truncateAtSentence(str, max) {
+  if (!str) return "";
+  if (str.length <= max) return str;
+  const chunk = str.slice(0, max);
+  const lastPeriod = chunk.lastIndexOf(".");
+  if (lastPeriod > max * 0.5) return str.slice(0, lastPeriod + 1).trim();
+  return chunk.trimEnd();
 }
 
 async function fetchImageAsBase64(url) {
@@ -106,10 +115,10 @@ async function buildPayload(e) {
   const sponsors = departments.map((d) => d.name);
   if (sponsors.length === 0) sponsors.push("Oberlin College");
 
-  const rawDescription = (e.description_text || e.description || "").replace(/<[^>]*>/g, " ").trim();
-  const description = truncate(rawDescription, 200) || "No description provided.";
-  const extendedDescription = truncate(rawDescription, 1000);
-  const title = truncate(e.title || "Untitled Event", 60);
+  const rawDescription = stripUrls((e.description_text || e.description || "").replace(/<[^>]*>/g, " ").trim());
+  const description = truncateAtSentence(rawDescription, 200) || "No description provided.";
+  const extendedDescription = truncateAtSentence(rawDescription, 1000);
+  const title = truncateAtSentence(e.title || "Untitled Event", 60);
   const contactEmail = e.custom_fields?.contact_email_address || FALLBACK_EMAIL;
   const phone = e.custom_fields?.contact_phone_number || undefined;
   const website = e.localist_url || e.url || undefined;
