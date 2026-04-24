@@ -215,7 +215,13 @@ export async function runIngester() {
 
     const { short, extended } = buildDescription(movie, showtimesForMovie, windowStart, windowEnd);
 
-    const poster  = movie.locale?.poster?.url || movie.poster || movie.images?.[0]?.url || null;
+    // Image priority: wide hero banner (landscape, best for CH) → portrait poster → still
+    const poster  =
+      movie.locale?.cmsAssets?.images?.find(i => i.type === "DEFAULT_HERO_IMAGE")?.url ||
+      movie.locale?.poster?.url ||
+      movie.poster ||
+      movie.images?.[0]?.url ||
+      null;
     const rating  = movie.releases?.[0]?.rating?.certificate || "NR";
     const genres  = typeof movie.genres === "string" ? movie.genres : (movie.genres || []).join(", ");
     const runtime = fmtRuntime(runtimeSec);
