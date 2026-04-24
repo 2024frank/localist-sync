@@ -14,6 +14,7 @@
 
 import { chromium } from "playwright";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
 
 const SOURCE = {
   id: "heritage_center",
@@ -108,7 +109,7 @@ async function fetchAllEvents() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-async function main() {
+export async function runIngester() {
   const now = new Date().toISOString();
 
   console.log("→ Fetching Heritage Center events via Playwright + Chromium TLS\n");
@@ -235,7 +236,10 @@ async function main() {
   return result;
 }
 
-main().catch(err => {
-  console.error("Fatal:", err);
-  process.exit(1);
-});
+// Run directly when called as a standalone script
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  runIngester().catch(err => {
+    console.error("Fatal:", err);
+    process.exit(1);
+  });
+}

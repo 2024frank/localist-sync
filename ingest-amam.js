@@ -15,6 +15,7 @@
 
 import { chromium } from "playwright";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
 
 const SOURCE = {
   id: "amam",
@@ -220,7 +221,7 @@ async function scrapeDetail(page, url, kind) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-async function main() {
+export async function runIngester() {
   const browser = await chromium.launch({ headless: true });
   const now = new Date().toISOString();
   const stagedEvents = [];
@@ -360,7 +361,10 @@ async function main() {
   return result;
 }
 
-main().catch(err => {
-  console.error("Fatal:", err);
-  process.exit(1);
-});
+// Run directly when called as a standalone script
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  runIngester().catch(err => {
+    console.error("Fatal:", err);
+    process.exit(1);
+  });
+}

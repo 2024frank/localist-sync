@@ -25,9 +25,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Run AMAM ingester
+      - name: Run AMAM sync pipeline
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           FALLBACK_EMAIL: ${{ secrets.FALLBACK_EMAIL }}
-        run: node ingest-amam.js
+        run: node sync-amam.js

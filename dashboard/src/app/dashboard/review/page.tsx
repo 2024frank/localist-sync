@@ -18,10 +18,17 @@ interface WriterPayload {
   [key: string]: unknown;
 }
 interface QueueItem {
-  id: string; localistId: string; source: string; status: string;
-  detectedAt: string; original: Original; writerPayload: WriterPayload;
+  id: string; localistId?: string; source: string; source_id?: string;
+  status: string; detectedAt: string; original: Original;
+  writerPayload: WriterPayload;
   publicCheck: { isPublic: boolean; confidence: number; reason: string };
 }
+
+const SOURCE_LABEL: Record<string, string> = {
+  localist:       "Oberlin Localist",
+  amam:           "Allen Memorial Art Museum",
+  heritage_center: "Oberlin Heritage Center",
+};
 
 function fmt(ts: number) {
   return new Date(ts * 1000).toLocaleString("en-US", {
@@ -181,6 +188,9 @@ export default function ReviewPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-zinc-500 text-[10px] border border-white/[0.08] rounded-full px-2 py-0.5">
+                        {SOURCE_LABEL[item.source_id || item.source] ?? item.source ?? "—"}
+                      </span>
                       {item.publicCheck && (
                         <span className="text-emerald-400 text-xs border border-emerald-400/30 rounded-full px-2 py-0.5">
                           Public {item.publicCheck.confidence}%
@@ -213,7 +223,9 @@ export default function ReviewPage() {
                   <div className="border-t border-white/[0.06] grid grid-cols-2 divide-x divide-white/[0.06]">
                     {/* Original */}
                     <div className="px-5 py-5 space-y-4">
-                      <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wide">Original (Localist)</p>
+                      <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wide">
+                        Original ({SOURCE_LABEL[item.source_id || item.source] ?? item.source ?? "Source"})
+                      </p>
 
                       {item.original.photoUrl && (
                         <img
@@ -234,7 +246,7 @@ export default function ReviewPage() {
                       </div>
                       {item.original.url && (
                         <a href={item.original.url} target="_blank" rel="noreferrer" className="text-[#C8102E] text-xs hover:underline">
-                          View on Localist ↗
+                          View on {SOURCE_LABEL[item.source_id || item.source] ?? "source"} ↗
                         </a>
                       )}
                     </div>
