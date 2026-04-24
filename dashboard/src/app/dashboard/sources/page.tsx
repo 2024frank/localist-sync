@@ -34,7 +34,22 @@ const SOURCES = [
     firestoreDoc: "localist",
     description: "Oberlin College's official event calendar",
   },
-  // More sources will be added here once confirmed working
+  {
+    id: "amam",
+    name: "Allen Memorial Art Museum",
+    url: "amam.oberlin.edu",
+    workflow: "sync-amam.yml",
+    firestoreDoc: "amam",
+    description: "AMAM public exhibitions and events",
+  },
+  {
+    id: "heritage_center",
+    name: "Oberlin Heritage Center",
+    url: "oberlinheritagecenter.org",
+    workflow: "sync-heritage-center.yml",
+    firestoreDoc: "heritage_center",
+    description: "Heritage Center tours, workshops, and community events",
+  },
 ];
 
 function timeAgo(iso: string) {
