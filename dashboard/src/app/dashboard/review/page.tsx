@@ -58,7 +58,7 @@ export default function ReviewPage() {
 
   function getPayload(item: QueueItem): WriterPayload {
     const e = edits[item.id] || {};
-    const base = { ...item.writerPayload };
+    const base = { ...(item.writerPayload || {}) } as WriterPayload;
     if (e.title !== undefined) base.title = e.title as string;
     if (e.description !== undefined) base.description = e.description as string;
     if (e.extendedDescription !== undefined) base.extendedDescription = e.extendedDescription as string;
@@ -156,7 +156,7 @@ export default function ReviewPage() {
             const isSelected = selected.has(item.id);
             const isPushing = pushing.has(item.id);
             const e = edits[item.id] || {};
-            const wp = item.writerPayload;
+            const wp = item.writerPayload || {} as WriterPayload;
             const session = wp.sessions?.[0];
 
             return (
@@ -214,10 +214,20 @@ export default function ReviewPage() {
                     {/* Original */}
                     <div className="px-5 py-5 space-y-4">
                       <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wide">Original (Localist)</p>
+
+                      {item.original.photoUrl && (
+                        <img
+                          src={item.original.photoUrl}
+                          alt={item.original.title}
+                          className="w-full h-36 object-cover rounded-lg"
+                        />
+                      )}
+
                       <Field label="Title" value={item.original.title} />
                       <Field label="Date" value={session ? `${fmt(session.startTime)} → ${fmt(session.endTime)}` : "—"} />
                       <Field label="Location" value={item.original.location || "—"} />
                       <Field label="Sponsors" value={item.original.sponsors?.join(", ") || "—"} />
+                      <Field label="Website" value={item.original.url || "—"} />
                       <div>
                         <p className="text-zinc-500 text-[10px] uppercase tracking-wide mb-1">Description (raw)</p>
                         <p className="text-zinc-400 text-xs leading-relaxed whitespace-pre-wrap break-words">{item.original.description || "—"}</p>
@@ -232,6 +242,14 @@ export default function ReviewPage() {
                     {/* Writer's version — editable */}
                     <div className="px-5 py-5 space-y-4">
                       <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Writer's Version <span className="text-zinc-600 normal-case font-normal">(editable)</span></p>
+
+                      {item.original.photoUrl && (
+                        <img
+                          src={item.original.photoUrl}
+                          alt={item.original.title}
+                          className="w-full h-36 object-cover rounded-lg opacity-60"
+                        />
+                      )}
 
                       <EditField label="Title" value={e.title ?? wp.title} onChange={v => setEdit(item.id, "title", v)} maxLen={60} />
 
