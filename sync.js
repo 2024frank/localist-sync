@@ -1,7 +1,7 @@
 import fs from "fs";
 
 const LOCALIST_API = "https://calendar.oberlin.edu/api/2/events";
-const COMMUNITYHUB_API = "https://oberlin.communityhub.cloud/api/legacy/calendar/posts";
+const COMMUNITYHUB_API = "https://oberlin.communityhub.cloud/api/legacy/calendar/post/submit";
 const PUSHED_IDS_FILE = "pushed_ids.json";
 const FALLBACK_EMAIL = process.env.FALLBACK_EMAIL || "frankkusiap@gmail.com";
 
@@ -104,7 +104,7 @@ function buildPayload(e) {
     public: "1",
   };
 
-  if (phone) payload.phone = phone;
+  payload.phone = phone || "";
   if (website) payload.website = website;
 
   if (locationType === "ph2" || locationType === "bo") {
