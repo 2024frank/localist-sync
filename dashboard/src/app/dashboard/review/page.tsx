@@ -366,9 +366,9 @@ export default function ReviewPage() {
                 {isExpanded && (
                   <div className="border-t border-white/[0.06]">
 
-                    {/* ── Unsaved-changes bar ─────────────────────────────── */}
+                    {/* ── Unsaved-changes indicator bar (no button — button is at bottom of form) ── */}
                     {(hasUnsaved || saveState !== "idle") && (
-                      <div className={`flex items-center justify-between gap-4 px-5 py-2.5 border-b ${
+                      <div className={`px-5 py-2.5 border-b ${
                         saveState === "saved"
                           ? "border-emerald-500/20 bg-emerald-500/[0.05]"
                           : saveState === "error"
@@ -384,17 +384,8 @@ export default function ReviewPage() {
                           {saveState === "saved"  && "✓ Changes saved — Approve will use this version"}
                           {saveState === "error"  && "✗ Save failed — try again"}
                           {saveState === "saving" && "Saving…"}
-                          {saveState === "idle" && hasUnsaved && `${Object.keys(e).length} unsaved change${Object.keys(e).length > 1 ? "s" : ""} — save before approving`}
+                          {saveState === "idle" && hasUnsaved && `${Object.keys(e).length} unsaved change${Object.keys(e).length > 1 ? "s" : ""} — scroll down and save before approving`}
                         </p>
-                        {(hasUnsaved || saveState === "error") && (
-                          <button
-                            onClick={() => save(item)}
-                            disabled={saveState === "saving"}
-                            className="text-xs font-semibold text-white bg-amber-500 hover:bg-amber-400 disabled:opacity-50 px-3 py-1 rounded-lg transition shrink-0"
-                          >
-                            {saveState === "saving" ? "Saving…" : "Save changes"}
-                          </button>
-                        )}
                       </div>
                     )}
 
@@ -499,12 +490,47 @@ export default function ReviewPage() {
                         onChange={v => setEdit(item.id, "sponsors", v.split(",").map((s: string) => s.trim()).filter(Boolean))}
                         borderClass={changed("sponsors")}
                       />
-                      <EditField label="Contact Email" value={e.contactEmail ?? wp.contactEmail ?? ""}
-                        onChange={v => setEdit(item.id, "contactEmail", v)} borderClass={changed("contactEmail")} />
+                      {/* Contact Email — datalist lets you pick or type */}
+                      <div>
+                        <label className="text-zinc-500 text-[10px] uppercase tracking-wide block mb-1">Contact Email</label>
+                        <input
+                          type="email"
+                          list={`email-options-${item.id}`}
+                          value={e.contactEmail ?? wp.contactEmail ?? ""}
+                          onChange={ev => setEdit(item.id, "contactEmail", ev.target.value)}
+                          className={`w-full bg-white/[0.04] border rounded-lg px-3 py-2 text-white text-xs focus:outline-none transition ${changed("contactEmail")}`}
+                        />
+                        <datalist id={`email-options-${item.id}`}>
+                          <option value="frankkusiap@gmail.com" />
+                          <option value="fkusiapp@oberlin.edu" />
+                        </datalist>
+                      </div>
+
                       <EditField label="Phone" value={e.phone ?? wp.phone ?? ""}
                         onChange={v => setEdit(item.id, "phone", v)} borderClass={changed("phone")} />
                       <EditField label="Website" value={e.website ?? wp.website ?? ""}
                         onChange={v => setEdit(item.id, "website", v)} borderClass={changed("website")} />
+
+                      {/* ── Save Changes — always at the bottom of the form ── */}
+                      <div className="pt-2 border-t border-white/[0.06]">
+                        <button
+                          onClick={() => save(item)}
+                          disabled={saveState === "saving" || (!hasUnsaved && saveState !== "error")}
+                          className={`w-full text-sm font-semibold py-2.5 rounded-lg transition ${
+                            hasUnsaved || saveState === "error"
+                              ? "bg-amber-500 hover:bg-amber-400 text-white"
+                              : saveState === "saved"
+                              ? "bg-emerald-600/30 text-emerald-400 cursor-default"
+                              : "bg-white/[0.05] text-zinc-600 cursor-default"
+                          }`}
+                        >
+                          {saveState === "saving" ? "Saving…" :
+                           saveState === "saved"  ? "✓ Saved" :
+                           saveState === "error"  ? "Retry Save" :
+                           hasUnsaved             ? "Save Changes" :
+                                                    "No changes"}
+                        </button>
+                      </div>
                     </div>
                     </div>
                   </div>
