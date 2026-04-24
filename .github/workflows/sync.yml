@@ -1,9 +1,9 @@
 name: Localist → CommunityHub Sync
 
 on:
-  schedule:
-    - cron: "0 * * * *"   # every hour
-  workflow_dispatch:        # allow manual runs
+  # schedule:
+  #   - cron: "0 * * * *"   # disabled while adding sources — re-enable once all confirmed
+  workflow_dispatch:        # manual runs only for now
 
 permissions:
   contents: write           # needed to commit pushed_ids.json back
