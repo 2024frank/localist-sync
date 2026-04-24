@@ -1,0 +1,36 @@
+name: Localist → CommunityHub Sync
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # every hour
+  workflow_dispatch:        # allow manual runs
+
+permissions:
+  contents: write           # needed to commit pushed_ids.json back
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run sync
+        env:
+          COMMUNITYHUB_TOKEN: ${{ secrets.COMMUNITYHUB_TOKEN }}
+          FALLBACK_EMAIL: ${{ secrets.FALLBACK_EMAIL }}
+        run: node sync.js
+
+      - name: Commit updated pushed_ids.json
+        run: |
+          git config user.name "2024frank"
+          git config user.email "frankkusiap@gmail.com"
+          git add pushed_ids.json
+          git diff --staged --quiet || git commit -m "chore: update pushed_ids.json"
+          git push
