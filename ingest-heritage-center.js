@@ -171,6 +171,7 @@ async function main() {
       short_description:    truncate(description, 200),
       extended_description: description || null,
       artwork_url,
+      _photoUrl: artwork_url || null, // mapped to image_cdn_url at push time
 
       source_id:        SOURCE.id,
       source_name:      SOURCE.source_name,

@@ -1,32 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const CH_API = "https://oberlin.communityhub.cloud/api/legacy/calendar/post/submit";
-
-async function fetchImageAsBase64(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") || "image/jpeg";
-    const buffer = await res.arrayBuffer();
-    return `data:${contentType};base64,${Buffer.from(buffer).toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
+const CH_CREATE_API = "https://oberlin.communityhub.cloud/api/legacy/calendar/post/submit";
 
 export async function POST(req: NextRequest) {
   const { payload } = await req.json();
 
-  // Pull out internal helper fields before sending to CommunityHub
+  // Pull out the internal helper field and map to the API's image_cdn_url field.
+  // The CommunityHub API accepts image URLs directly — no base64 conversion needed.
   const photoUrl: string | null = payload._photoUrl ?? null;
   delete payload._photoUrl;
 
   if (photoUrl) {
-    const img = await fetchImageAsBase64(photoUrl);
-    if (img) payload.image = img;
+    payload.image_cdn_url = photoUrl;
   }
 
-  const res = await fetch(CH_API, {
+  // Always submit under the project email
+  payload.email = "fkusiapp@oberlin.edu";
+
+  const res = await fetch(CH_CREATE_API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -34,7 +25,10 @@ export async function POST(req: NextRequest) {
 
   if (!res.ok) {
     const text = await res.text();
-    return NextResponse.json({ error: `CommunityHub ${res.status}: ${text}` }, { status: 502 });
+    return NextResponse.json(
+      { error: `CommunityHub ${res.status}: ${text}` },
+      { status: 502 }
+    );
   }
 
   return NextResponse.json(await res.json());

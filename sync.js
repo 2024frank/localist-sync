@@ -339,7 +339,8 @@ async function buildWriterPayload(e) {
     payload.buttons = [{ title: "Learn More", link: e.ticket_url }];
   }
 
-  // Store photo URL separately (fetched at push time to avoid large Firestore docs)
+  // Pass image URL directly — CommunityHub API accepts image_cdn_url natively.
+  // We store it as _photoUrl in Firestore; push-event/route.ts maps it to image_cdn_url.
   payload._photoUrl = e.photo_url || null;
 
   return payload;
