@@ -109,6 +109,8 @@ function buildPayload(e) {
 
   if (locationType === "ph2" || locationType === "bo") {
     payload.location = location || "Oberlin, OH";
+    payload.placeId = "";
+    payload.placeName = "";
   }
   if (locationType === "on" || locationType === "bo") {
     payload.urlLink = streamUrl || website || "https://calendar.oberlin.edu";
