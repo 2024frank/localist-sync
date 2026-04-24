@@ -50,6 +50,14 @@ const SOURCES = [
     firestoreDoc: "heritage_center",
     description: "Heritage Center tours, workshops, and community events",
   },
+  {
+    id: "apollo_theatre",
+    name: "Apollo Theatre",
+    url: "clevelandcinemas.com/apollo-theatre",
+    workflow: "sync-apollo-theatre.yml",
+    firestoreDoc: "apollo_theatre",
+    description: "Movies playing at the Apollo Theatre in Oberlin — next 14 days",
+  },
 ];
 
 function timeAgo(iso: string) {
