@@ -15,6 +15,7 @@
 import { chromium } from "playwright";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
+import { runPipeline } from "./pipeline.js";
 
 const SOURCE = {
   id: "heritage_center",
@@ -238,8 +239,10 @@ export async function runIngester() {
 
 // Run directly when called as a standalone script
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  runIngester().catch(err => {
-    console.error("Fatal:", err);
-    process.exit(1);
-  });
+  const { stagedEvents, candidates } = await runIngester();
+  await runPipeline(
+    stagedEvents.map((e, i) => ({ ...e, fingerprint: candidates[i]?.fingerprint })),
+    "heritage_center",
+    "Oberlin Heritage Center"
+  );
 }
