@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 
 const CH_CREATE_API = "https://oberlin.communityhub.cloud/api/legacy/calendar/post/submit";
 
@@ -14,8 +16,8 @@ export async function POST(req: NextRequest) {
     payload.image_cdn_url = photoUrl;
   }
 
-  // Always submit under the project email
-  payload.email = "fkusiapp@oberlin.edu";
+  // Always submit under the admin Gmail
+  payload.email = "frankkusiap@gmail.com";
 
   const res = await fetch(CH_CREATE_API, {
     method: "POST",
@@ -31,5 +33,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json(await res.json());
+  const data = await res.json();
+
+  // Increment the real push counter in Firestore so the Overview dashboard
+  // always shows the true number of events submitted to CommunityHub.
+  try {
+    const db = getAdminDb();
+    await db.collection("syncs").doc("global").set(
+      {
+        totalPushed: FieldValue.increment(1),
+        lastPushedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch {
+    // Non-fatal — counter miss is better than blocking a successful push
+  }
+
+  return NextResponse.json(data);
 }
