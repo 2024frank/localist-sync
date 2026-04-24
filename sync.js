@@ -79,7 +79,11 @@ function toUnix(isoString) {
 
 function stripUrls(str) {
   if (!str) return "";
-  return str.replace(/https?:\/\/\S+/g, "").replace(/\s{2,}/g, " ").trim();
+  return str
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\b(streaming video|watch (the )?webcast|live stream|stream link|video link)\s*[:\-]?\s*/gi, "")
+    .split("\n").map(l => l.trim()).filter(l => l.length > 0).join(" ")
+    .replace(/\s{2,}/g, " ").trim();
 }
 
 function truncateAtSentence(str, max) {
