@@ -40,72 +40,95 @@ For organizations without a machine-readable feed, we will write a lightweight s
 
 ---
 
-## Phase 3 — AI Deduplication
+## Phase 3 — AI Deduplication + Human Review Dashboard
 
-When two different source calendars list the same real-world event, we should post it to CommunityHub only once. This is the AI component of the project.
+### Why We Need AI for This
 
-### The Problem
+Once events are coming in from multiple source calendars, the same real-world event will appear more than once. A concert at Finney Chapel might be posted by the music department on Localist and by FAVA on their own calendar. These two listings will have different titles, different descriptions, and different contact info — but they are the same event.
 
-A concert at Finney Chapel might appear on:
-- Oberlin College's Localist calendar (posted by the music department)
-- FAVA's calendar (posted by the presenting organization)
+Simple string matching does not work here. You cannot compare "Spring Chamber Music Concert" against "Oberlin Conservatory Chamber Performance — April 26" and get a reliable answer. The wording is too different. An AI agent can read both listings in full, understand what each one is describing, and make the right call. That is what this phase builds.
 
-The titles and descriptions will probably be different. We cannot match them with simple string comparison.
+### How the Duplicate Agent Works
 
-### Approach: Start Time as Anchor, LLM as Judge
-
-Start time is the most reliable field. Two events with the same start time and overlapping details are very likely the same event.
-
-Algorithm:
+Before posting any new event, the sync script runs it through a duplicate check:
 
 ```
-For each new event being pushed:
-  1. Query CommunityHub for all pending/approved events on the same day
+For each new incoming event:
+  1. Pull all events already on the calendar for that day
   2. Filter to events within 30 minutes of the same start time
-  3. If any candidates exist:
-       a. Build a prompt containing both events' title, description, location, and organizer
-       b. Ask the LLM: "Are these the same real-world event? Answer YES or NO."
-       c. If YES: skip this push (duplicate detected)
-       d. If NO: push as a new event
-  4. If no candidates: push as a new event
+  3. If there are candidates:
+       a. Send both events to the AI agent with a comparison prompt
+       b. Agent returns: DUPLICATE or NEW
+       c. If DUPLICATE: flag the event, do not post it, send to review queue
+       d. If NEW: post the event as normal
+  4. If no candidates: post the event as normal
 ```
+
+Start time is the anchor because it is the most stable field across platforms. Two events at the same time and place are almost certainly the same event — the AI just confirms it by reading the content.
+
+### The Management and Insights Dashboard
+
+Because this is a research project, we do not want the AI making silent decisions. We want to measure how well it works and give humans a way to correct it when it is wrong.
+
+We will build a dashboard with a **Duplicates** tab. Every event the AI agent flags goes into a review queue instead of being discarded automatically. The tab shows the two events side by side:
+
+- The event already on the calendar
+- The incoming event the agent flagged as a duplicate
+
+A human reviewer looks at both and makes a call:
+
+**Option 1 — Confirmed duplicate**
+The human agrees with the agent. The flagged event is discarded. The agent gets a point.
+
+**Option 2 — Not a duplicate**
+The human disagrees. The flagged event is submitted to the calendar as a new event. The agent gets marked wrong.
+
+### Research Grading
+
+Every human decision is a data point for grading the agent's accuracy. If the agent flagged 10 events and the human confirmed 9 of them were real duplicates, the agent scores 9/10 for that batch. Over time this gives us:
+
+- A clear accuracy metric showing how well the AI identifies duplicates
+- A labeled dataset of confirmed and rejected duplicate pairs
+- A feedback loop — patterns in the wrong calls can inform prompt improvements
+
+This is the core research contribution: not just building a deduplication system, but measuring how well AI can solve this problem in a real community calendar context.
 
 ### LLM Choice
 
 We plan to use **Google Gemini** (via the Gemini API) because:
 - Oberlin has a relationship with Google through the grant program
 - API tokens are being requested through the grant
-- Gemini Flash is fast and inexpensive for short comparison prompts
+- Gemini Flash is fast and cheap for short comparison prompts
 
-Fallback: if no API key is available, the system will push and flag potential duplicates in the console log for manual review.
-
-### Implementation Notes
-
-- The LLM call adds ~1-2 seconds per potential duplicate check. For most events there will be no candidates, so the call is skipped entirely.
-- We cache the CommunityHub event list at the start of each sync run to avoid repeated API calls.
-- False positives (blocking a legitimate new event) are worse than false negatives (allowing a duplicate). The LLM prompt will be tuned to prefer "NO" when uncertain.
-- Human moderator (Maddy) provides a final safety net since all pushed events are pending before approval.
+Fallback: if no API key is available, all events with matching start times get flagged automatically for human review rather than being blocked.
 
 ### Prompt Template (Draft)
 
 ```
 You are helping deduplicate community event listings.
 
-Event A (already posted):
+Event A (already on the calendar):
 Title: {titleA}
 Start: {startA}
 Location: {locationA}
 Description: {descriptionA}
 
-Event B (candidate to post):
+Event B (incoming, candidate to post):
 Title: {titleB}
 Start: {startB}
 Location: {locationB}
 Description: {descriptionB}
 
 Are Event A and Event B the same real-world event?
-Answer only YES or NO.
+Answer only DUPLICATE or NEW.
 ```
+
+### Implementation Notes
+
+- The AI call only happens when there are candidates (same day, within 30 minutes). Most events will have no candidates and go straight through.
+- We cache the calendar event list at the start of each sync run to avoid repeated API calls.
+- False positives (blocking a real new event) are worse than false negatives (letting a duplicate through). The prompt will be tuned to prefer NEW when uncertain — the human review queue is the safety net.
+- The dashboard review queue is persistent. Flagged events stay in the queue until a human acts on them.
 
 ---
 
