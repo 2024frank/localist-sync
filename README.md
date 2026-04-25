@@ -1,18 +1,29 @@
 # Oberlin Community Calendar Unification
 
-An AI-assisted project to bring all Oberlin community events into one place.
+An AI-assisted system that aggregates events from every major Oberlin source,
+filters them through a three-agent AI pipeline, and lets a human reviewer
+approve them before they appear on the
+[Oberlin Community Calendar](https://oberlin.communityhub.cloud).
 
 ---
 
 ## The Problem
 
-Event information in Oberlin is scattered. Oberlin College, FAVA, AMAM, the City of Oberlin, local businesses, and student organizations each manage their own calendar on their own platform. There is no single place where students, faculty, staff, and Oberlin residents can see everything happening in the community.
+Event information in Oberlin is scattered across a dozen different platforms.
+Oberlin College, FAVA, AMAM, the Apollo Theatre, the public library, and local
+organizations each publish their own calendar. There is no single place where
+students, faculty, staff, and Oberlin residents can see everything happening in
+the community.
 
 ---
 
-## The Goal
+## The Solution
 
-Build a system that automatically pulls events from every major Oberlin community source, runs them through an AI review pipeline, and lets a human reviewer approve them before they appear on the [Oberlin Community Calendar](https://oberlin.communityhub.cloud).
+Automated sync pipelines pull events from every source on a schedule, run each
+event through three Gemini-powered AI agents (duplicate check, public-access
+filter, description cleaner), and queue survivors for human review in a
+custom dashboard. One click approves an event and posts it to CommunityHub.
+Events are **never** posted automatically — a human must approve every one.
 
 ---
 
@@ -25,62 +36,141 @@ Build a system that automatically pulls events from every major Oberlin communit
 
 ---
 
-## Pipeline Flow
+## Active Sources
 
-Events **never** go to CommunityHub automatically. Every event must be approved by a human reviewer in the dashboard.
+| Source | Method | Schedule | Notes |
+|---|---|---|---|
+| **Oberlin Localist** | REST API (paginated) | Hourly | Oberlin College's official calendar — up to 365 days ahead |
+| **Allen Memorial Art Museum** | Playwright scrape | Hourly | Exhibition and event pages on `amam.oberlin.edu` |
+| **Oberlin Heritage Center** | Playwright scrape | Hourly | Tours, workshops, and community events |
+| **Apollo Theatre** | Cleveland Cinemas API | Hourly | Movies playing next 14 days — one event per film, all showtimes as sessions |
+| **Oberlin College Libraries** | LibCal AJAX API | Every 6 h | Author talks, concerts, exhibitions — 60-day rolling window |
+
+---
+
+## AI Pipeline
+
+Every event flows through three agents in sequence. Gemini (`gemini-2.5-flash`)
+powers all three.
 
 ```
-Source Calendar (Localist, AMAM, etc.)
-        │
-        ▼
-1. Fetch CommunityHub snapshot
-   └─ Pull all current CH events to use for duplicate detection
-
-2. Fetch events from source
-   └─ Localist API: all live, public events up to 365 days ahead
-
-3. Duplicate Agent  ──────────────────────────────────────────────
-   └─ Same date + title/location overlap? → Pre-filter candidate
-   └─ Gemini confirms at ≥70% confidence → Tag as duplicate
-   └─ Duplicate: sent to Duplicates tab (not posted)
-
-4. Public Agent  ─────────────────────────────────────────────────
-   └─ Is this event open to any Oberlin resident (no affiliation)?
-   └─ Private at ≥75% confidence → Rejected tab (not posted)
-
-5. Writer Agent  ─────────────────────────────────────────────────
-   └─ Gemini cleans description: removes URLs, shortens to limits
-   └─ Produces "before" (original) and "after" (cleaned) versions
-
-6. Review Queue tab on dashboard  ───────────────────────────────
-   └─ Reviewer sees: original event │ Writer's cleaned version
-   └─ Reviewer can edit any field
-   └─ Approve → event posted to CommunityHub
-   └─ Reject → counted in analytics
-
-7. Duplicates tab  ───────────────────────────────────────────────
-   └─ Shows flagged pairs side by side
-   └─ Confirm → discard the incoming event
-   └─ Override → post it anyway (AI was wrong)
+Source Calendar
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  1. Duplicate Agent                                             │
+│     Layer 1: date window check (±1 day)                        │
+│     Layer 2: Jaccard title similarity (≥ 0.35 threshold)       │
+│     Layer 3: location word overlap guard                        │
+│     Layer 4: Gemini confirms at ≥ 70% confidence               │
+│     Layer 5: Firestore within-queue guard (already pending?)    │
+│     → Duplicate → Duplicates tab (not posted)                   │
+└─────────────────────────────────────────────────────────────────┘
+      │ (not duplicate)
+      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  2. Public Agent                                                │
+│     Gemini answers: can any Oberlin resident attend with        │
+│     no college affiliation?                                     │
+│     → Private at ≥ 75% confidence → Rejected tab               │
+└─────────────────────────────────────────────────────────────────┘
+      │ (public)
+      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  3. Writer Agent                                                │
+│     Gemini cleans the description:                             │
+│       - Strips all URLs and stream links                        │
+│       - Summarizes to ≤ 200 chars (short) / ≤ 1000 (extended)  │
+│       - Ends at a sentence boundary                             │
+│     Builds the full CommunityHub API payload                    │
+└─────────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Review Queue (dashboard)                                       │
+│     Reviewer sees: original event │ Writer's cleaned version   │
+│     Reviewer can edit any field                                 │
+│     Approve → posted to CommunityHub → awaits their moderation  │
+│     Reject  → counted in analytics                             │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Dashboard
 
-The research dashboard is deployed at `https://ai-microgrant-research-oberlin.vercel.app`.
+Deployed at **`https://ai-microgrant-research-oberlin.vercel.app`**
 
-Sign in with an authorized Google account. Only `frankkusiap@gmail.com` has admin access by default. Other users can be added from the Users page.
+Sign in with an authorized Google account. Only `frankkusiap@gmail.com` has
+admin access by default; other accounts can be added from the Users page.
 
 | Page | Purpose |
 |---|---|
-| Overview | Pipeline stats: events analyzed, queued, skipped, last run |
-| Review Queue | Approve or reject events before they go to CommunityHub |
-| Rejected | Events blocked by the AI agents (private or duplicate) |
-| Sources | Trigger a sync run manually; view last run details |
-| Duplicates | Review flagged duplicate pairs |
-| AI Analysis | Gemini agent performance metrics |
-| Users | Add/remove authorized Google accounts (admin only) |
+| **Overview** | Pipeline stats per source: analyzed, queued, skipped, last run time |
+| **Review Queue** | Side-by-side original vs Writer's version — edit, then approve or reject |
+| **Rejected** | Events blocked by AI agents (private or duplicate) |
+| **Sources** | Trigger a sync run manually; view last run status and GitHub Actions link |
+| **Duplicates** | Flagged pairs side-by-side — confirm or override |
+| **AI Analysis** | Gemini agent performance metrics |
+| **Users** | Add / remove authorized Google accounts (admin only) |
+
+### Review Queue features
+
+- **Amber border** on any field = unsaved edit in progress
+- **Save Changes** button at bottom locks in edits to Firestore before approving
+- **Contact Email datalist** — click the field to pick `frankkusiap@gmail.com`
+  or `fkusiapp@oberlin.edu` without typing
+- **Bulk approve** — check multiple events, then "Approve N selected"
+- **Auto-expire** — events whose start time has passed are auto-rejected on load
+
+---
+
+## Repository Structure
+
+```
+AI-Microgrant-Research-Oberlin/
+│
+├── ingest-*.js              # One ingester per source — pure data fetch + stage
+│   ├── ingest-amam.js
+│   ├── ingest-apollo-theatre.js
+│   ├── ingest-heritage-center.js
+│   ├── ingest-oberlin-libcal.js
+│   └── (+ city-of-oberlin, experience-oberlin, fava, oberlin-library)
+│
+├── sync-*.js                # One sync script per source — runs ingester then pipeline
+│   ├── sync-amam.js
+│   ├── sync-apollo-theatre.js
+│   ├── sync-heritage-center.js
+│   ├── sync-oberlin-libcal.js
+│   └── (+ others)
+│
+├── sync.js                  # Localist-specific sync (older, self-contained)
+├── pipeline.js              # Shared pipeline used by AMAM and Heritage Center
+│
+├── lib/
+│   └── duplicate-agent.js   # Shared duplicate-detection logic (all 5 layers)
+│
+├── .github/workflows/
+│   ├── sync.yml             # Localist — hourly cron + workflow_dispatch
+│   ├── sync-amam.yml        # AMAM — hourly
+│   ├── sync-apollo-theatre.yml  # Apollo — hourly
+│   ├── sync-heritage-center.yml # Heritage Center — hourly
+│   └── sync-oberlin-libcal.yml  # LibCal — every 6 hours
+│
+└── dashboard/               # Next.js app (deployed on Vercel)
+    └── src/app/
+        ├── dashboard/       # All dashboard pages
+        │   ├── review/      # Review Queue
+        │   ├── sources/     # Source management + manual trigger
+        │   ├── duplicates/  # Duplicate pair review
+        │   ├── rejected/    # Rejected events
+        │   ├── ai-analysis/ # Agent metrics
+        │   └── users/       # User management
+        └── api/
+            ├── push-event/  # POST → CommunityHub API
+            ├── sync/trigger/ # GET status / POST dispatch / DELETE cancel
+            └── admin/       # User management + data clearing
+```
 
 ---
 
@@ -90,75 +180,107 @@ Sign in with an authorized Google account. Only `frankkusiap@gmail.com` has admi
 
 | Collection | Purpose |
 |---|---|
-| `review_queue` | Events waiting for human approval (status: pending / approved / rejected_manual) |
-| `rejected` | Events blocked by AI agents (reason: private or duplicate) |
-| `duplicates` | Flagged duplicate pairs pending human review |
-| `syncs` | Pipeline run statistics |
+| `review_queue` | Pending / approved / rejected events — one doc per event |
+| `rejected` | Events blocked by AI (reason: `private` or `duplicate`) |
+| `duplicates` | Flagged duplicate pairs awaiting human confirmation |
+| `syncs` | Per-source pipeline run statistics (queued, skipped, analyzed…) |
 
-### Field Mapping
+### CommunityHub Field Mapping
 
-| CommunityHub Field | Source |
+| CH Field | Source |
 |---|---|
-| `title` | `event.title` (max 60 chars) |
-| `description` | `event.description_text` — Gemini cleaned, max 200 chars |
-| `extendedDescription` | `event.description_text` — Gemini cleaned, max 1000 chars |
-| `email` / `contactEmail` | `event.custom_fields.contact_email_address` |
-| `phone` | `event.custom_fields.contact_phone_number` |
-| `website` | `event.localist_url` |
-| `sponsors` | `event.filters.departments[].name` |
-| `postTypeId` | Mapped from `event.filters.event_types[].name` |
-| `sessions.startTime` | `event.event_instances[0].start` (unix timestamp) |
-| `sessions.endTime` | `event.event_instances[0].end` (unix timestamp) |
-| `locationType` | `event.experience` → `ph2` / `on` / `bo` |
-| `location` | `event.address` or `event.location_name` |
-| `urlLink` | `event.stream_url` (virtual or hybrid only) |
-| `image` | `event.photo_url` fetched and base64-encoded at push time |
+| `title` | Event title (max 60 chars) |
+| `description` | Gemini-cleaned short description (max 200 chars) |
+| `extendedDescription` | Gemini-cleaned full description (max 1000 chars) |
+| `email` / `contactEmail` | Always `frankkusiap@gmail.com` — never the source event's email |
+| `phone` | Contact phone from source, or empty |
+| `website` | Source event URL |
+| `sponsors` | Department / organization name from source |
+| `postTypeId` | Mapped from event type keywords (see table below) |
+| `sessions[].startTime` | Unix timestamp |
+| `sessions[].endTime` | Unix timestamp |
+| `locationType` | `ph2` (in-person) / `on` (online) / `bo` (hybrid) |
+| `location` | Address or venue name |
+| `_photoUrl` | Image URL — uploaded by push-event route at approval time |
 
-### Event Type Mapping
+### Event Type → Category ID
 
-| Localist Type | Category ID |
+| Keywords | Category ID |
 |---|---|
-| Lecture / Talk / Presentation / Seminar / Conference | `6` |
-| Music / Concert | `8` |
-| Theatre / Dance / Performance | `9` |
-| Workshop / Class | `7` |
-| Exhibit / Exhibition / Gallery | `2` |
-| Festival / Fair / Celebration | `3` |
-| Tour / Open House | `4` |
-| Sport / Recreation / Game | `12` |
-| Networking | `13` |
-| Anything else | `89` (Other) |
-
-### Files
-
-| File | Purpose |
-|---|---|
-| `sync.js` | Main pipeline script (run by GitHub Actions) |
-| `pushed_ids.json` | Reserved — currently unused; Firestore tracks processed IDs |
-| `dashboard/` | Next.js research dashboard (deployed on Vercel) |
-| `.github/workflows/sync.yml` | GitHub Actions workflow (manual trigger) |
+| lecture, talk, presentation, seminar, conference, symposium | `6` |
+| music, concert | `8` |
+| performance, theatre, theater, dance, film, movie, screening | `9` |
+| workshop, class | `7` |
+| exhibit, exhibition, gallery, display | `2` |
+| festival, fair, celebration | `3` |
+| tour, open house | `4` |
+| sport, game, recreation | `12` |
+| networking | `13` |
+| *(anything else)* | `89` (Other) |
 
 ### GitHub Secrets Required
 
 | Secret | Purpose |
 |---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin SDK credentials |
-| `GEMINI_API_KEY` | Google Gemini API key for AI agents |
-| `FALLBACK_EMAIL` | Default contact email when an event has none |
-| `GITHUB_PAT` | Personal access token for workflow triggering |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin SDK credentials (JSON, base64 optional) |
+| `GEMINI_API_KEY` | Google Gemini API key — powers all three AI agents |
+| `GITHUB_PAT` | Personal access token for dashboard → workflow_dispatch trigger |
 
 ### Triggering a Sync
 
-The sync runs manually only. To trigger it:
+Syncs run automatically on their cron schedule. To run one immediately:
 
-1. Go to **GitHub → Actions → Localist → CommunityHub Sync → Run workflow**
-2. Or use the **Start** button on the Sources page of the dashboard
+1. **Dashboard** → Sources → click **Start** next to any source
+2. **GitHub** → Actions → pick the workflow → **Run workflow**
 
 ---
 
-## What Is Next
+## Duplicate Detection (5-layer algorithm)
 
-- Add AMAM, FAVA, and City of Oberlin as additional sources
-- Scheduled automatic sync (currently manual only)
-- Events page in dashboard showing all approved/pushed events
-- AI agent accuracy metrics and feedback loop
+Implemented in `lib/duplicate-agent.js`, shared across all sync scripts.
+
+| Layer | Method | Cost |
+|---|---|---|
+| 1 | Date window: events must be within ±1 calendar day | ⚡ free |
+| 2 | Jaccard title similarity ≥ 0.35 on words ≥ 4 chars | ⚡ free |
+| 3 | Location word overlap (at least one 4-char word in common) | ⚡ free |
+| 4 | Gemini AI confirmation at ≥ 70% confidence | 🐢 API call |
+| 5 | Firestore within-queue guard (same slug already pending) | 🐢 DB read |
+
+Only events that pass layers 1–3 are sent to Gemini. Tunable constants
+(`TITLE_JACCARD_THRESHOLD`, `DATE_WINDOW_DAYS`, `MIN_GEMINI_CONFIDENCE`) live
+at the top of `lib/duplicate-agent.js`.
+
+---
+
+## Source-Specific Notes
+
+### Apollo Theatre
+- Uses the **Cleveland Cinemas internal box-office API** — no browser needed
+- One event per movie; each showtime slot becomes its own `session` object
+- 14-day rolling window (posts go out Fridays; two weeks covers next post + the one after)
+- `fetchSchedule` is non-fatal — if the schedule API fails on GitHub Actions IPs
+  (ECONNRESET is common), it falls back to 7 PM ET sessions on each playing date
+- Poster images: prefers wide hero banner → locale poster → fallback
+
+### Oberlin College Libraries (LibCal)
+- Uses the **LibCal AJAX JSON API** at `oberlin.libcal.com/ajax/calendar/list`
+- Calendar ID: `10805` (Oberlin College Libraries Events)
+- 60-day rolling window; paginates automatically if more than 100 events
+- `featured_image` field provides CloudFront image URLs — no auth needed
+- Public Agent defaults to PUBLIC for library events (most are open to all)
+
+### Allen Memorial Art Museum / Heritage Center
+- Both use **Playwright** (headless Chromium) to scrape event pages
+- AMAM mirrors its exhibitions alongside the Allen Art Museum's shows
+- Heritage Center: tours, workshops, walking tours — most require advance booking
+
+---
+
+## What's Next
+
+- FAVA Gallery ingester (selector fix for `/classes/YYYY/MM/DD/…` pages)
+- City of Oberlin events (mostly government meetings — needs user decision)
+- Events page in dashboard showing all approved/posted events with CH links
+- AI agent accuracy feedback loop (track which Gemini verdicts reviewers override)
+- Vercel scheduled function to auto-expire stale queue items server-side

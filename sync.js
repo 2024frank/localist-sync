@@ -1,14 +1,41 @@
+/**
+ * sync.js — Oberlin Localist → CommunityHub Sync Pipeline
+ * ─────────────────────────────────────────────────────────────────────────────
+ * SOURCE: Oberlin College Localist (https://calendar.oberlin.edu)
+ * ADAPTER: localist_v1
+ * ─────────────────────────────────────────────────────────────────────────────
+ * The original (and most feature-complete) sync script. Pulls all live public
+ * events from Oberlin College's Localist calendar API, runs each through the
+ * five-layer Duplicate Agent, Public Agent, and Writer Agent (Gemini), then
+ * saves survivors to Firestore `review_queue` for human approval.
+ *
+ * Run by GitHub Actions (sync.yml) on an hourly cron, or via:
+ *   node --env-file=.env sync.js
+ *
+ * Key design decisions:
+ *   - Uses the full lib/duplicate-agent.js (5 layers) unlike the shared
+ *     pipeline.js which uses a simpler 2-layer pre-filter.
+ *   - pushed_ids.json tracks event IDs that have been pushed to CommunityHub
+ *     so re-approved events don't get posted twice.
+ *   - Writer Agent calls Gemini twice: once for short desc (200 chars) and
+ *     once for extended desc (1000 chars).
+ */
+
 import fs from "fs";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import {
-  mightBeDuplicate,
-  checkDuplicateInQueue,
-  geminiCheckDuplicate as _geminiCheckDuplicate,
-  makeRunDeduplicator,
-  MIN_GEMINI_CONFIDENCE,
+  mightBeDuplicate,         // layers 1–3: cheap CPU pre-filter
+  checkDuplicateInQueue,    // layer 5: Firestore within-queue guard
+  geminiCheckDuplicate as _geminiCheckDuplicate,  // layer 4: Gemini confirmation
+  makeRunDeduplicator,      // within-run dedup (catches same event appearing twice in one fetch)
+  MIN_GEMINI_CONFIDENCE,    // 70 — minimum confidence to treat as duplicate
 } from "./lib/duplicate-agent.js";
 
+/**
+ * Initialize Firebase Admin SDK (idempotent).
+ * Returns Firestore or null if credentials unavailable.
+ */
 function initFirebase() {
   if (getApps().length > 0) return getFirestore();
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -23,15 +50,24 @@ function initFirebase() {
   }
 }
 
+// Localist API — returns paginated JSON of all calendar events
 const LOCALIST_API = "https://calendar.oberlin.edu/api/2/events";
+// CommunityHub API — fetch all future events for duplicate detection
 const COMMUNITYHUB_POSTS_API =
   "https://oberlin.communityhub.cloud/api/legacy/calendar/posts?limit=10000&page=0&filter=future&tab=main-feed&isJobs=false&order=ASC&postType=All&allPosts";
+// Local JSON file tracking which Localist event IDs have already been pushed
 const PUSHED_IDS_FILE = "pushed_ids.json";
 // Always use the owner's email for contactEmail — never pull from the source event.
 const OWNER_EMAIL = "frankkusiap@gmail.com";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.5-flash";
 
+// ─── CommunityHub post type mapping ─────────────────────────────────────────
+
+/**
+ * Map keyword → CommunityHub category ID.
+ * Order matters: first match wins, so more-specific keywords should go first.
+ */
 const POST_TYPE_MAP = {
   "lecture": 6, "talk": 6, "presentation": 6, "seminar": 6,
   "symposium": 6, "conference": 6, "music": 8, "concert": 8,
@@ -42,6 +78,10 @@ const POST_TYPE_MAP = {
   "recreation": 12, "networking": 13,
 };
 
+/**
+ * Convert Localist event_types array → array of CommunityHub category IDs.
+ * Falls back to [89] (Other) when no keyword matches.
+ */
 function mapPostTypeIds(eventTypes = []) {
   const ids = new Set();
   for (const et of eventTypes) {
@@ -55,12 +95,17 @@ function mapPostTypeIds(eventTypes = []) {
   return ids.size > 0 ? [...ids] : [89];
 }
 
+/**
+ * Map Localist "experience" field → CommunityHub locationType code.
+ * ph2 = in-person, on = online, bo = hybrid (both)
+ */
 function mapLocationType(experience) {
   if (experience === "virtual") return "on";
   if (experience === "hybrid") return "bo";
   return "ph2";
 }
 
+/** Convert ISO timestamp string to Unix seconds. */
 function toUnix(isoString) {
   return Math.floor(new Date(isoString).getTime() / 1000);
 }
@@ -202,13 +247,19 @@ async function fetchCommunityHubEvents() {
   }
 }
 
+// ─── Data fetching ────────────────────────────────────────────────────────────
+
+/**
+ * Paginate through the Localist API and return all live, non-private events
+ * within the next `days` days. Stops after `maxPages` pages as a safety cap.
+ */
 async function fetchLocalist(days = 365, pp = 100, maxPages = 10) {
   let page = 1, totalPages = 1;
   const events = [];
   while (page <= totalPages && page <= maxPages) {
     const url = new URL(LOCALIST_API);
     url.searchParams.set("days", String(days));
-    url.searchParams.set("pp", String(pp));
+    url.searchParams.set("pp", String(pp));     // results per page
     url.searchParams.set("page", String(page));
     const res = await fetch(url, { headers: { "User-Agent": "localist-sync-bot/1.0" } });
     if (!res.ok) throw new Error(`Localist HTTP ${res.status}`);
@@ -218,6 +269,7 @@ async function fetchLocalist(days = 365, pp = 100, maxPages = 10) {
     totalPages = Math.max(1, Math.ceil(total / pp));
     for (const wrapped of items) {
       const e = wrapped.event;
+      // Skip draft/cancelled events and events marked private by the organizer
       if (!e || e.status !== "live" || e.private) continue;
       events.push(e);
     }
@@ -226,7 +278,11 @@ async function fetchLocalist(days = 365, pp = 100, maxPages = 10) {
   return events;
 }
 
-// Load all IDs already in the review_queue or rejected collections (any status)
+/**
+ * Load all event IDs already in Firestore (review_queue OR rejected).
+ * Used to skip events we've already processed — prevents re-queuing on
+ * every hourly run.
+ */
 async function loadProcessedIds(db) {
   if (!db) return new Set();
   try {
@@ -243,6 +299,11 @@ async function loadProcessedIds(db) {
   }
 }
 
+/**
+ * pushed_ids.json — tracks which Localist event IDs have been approved and
+ * pushed to CommunityHub. Committed back to the repo by sync.yml after each run
+ * so it persists across GitHub Actions jobs.
+ */
 function loadPushedIds() {
   if (!fs.existsSync(PUSHED_IDS_FILE)) return new Set();
   return new Set(JSON.parse(fs.readFileSync(PUSHED_IDS_FILE, "utf8")));

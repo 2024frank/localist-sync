@@ -1,3 +1,19 @@
+/**
+ * review/page.tsx — Review Queue
+ *
+ * Displays all events with status "pending" in Firestore review_queue.
+ * Each card shows the original source event alongside the Writer Agent's
+ * cleaned version (writerPayload). The reviewer can edit any field,
+ * save changes to Firestore, then approve (→ posted to CommunityHub) or
+ * reject (→ status updated, removed from queue view).
+ *
+ * Key UX rules:
+ *   - Amber field border = unsaved local edit
+ *   - Save Changes button locks edits into Firestore before approving
+ *   - Events whose start time has already passed are auto-rejected on load
+ *   - writerEdited flag is written to Firestore on approval so we can
+ *     track how often reviewers modify the AI's output
+ */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -24,10 +40,14 @@ interface QueueItem {
   publicCheck: { isPublic: boolean; confidence: number; reason: string };
 }
 
+// Human-readable source labels shown in the review card header and on the
+// "View on source →" link. Add new sources here as they are wired up.
 const SOURCE_LABEL: Record<string, string> = {
-  localist:       "Oberlin Localist",
-  amam:           "Allen Memorial Art Museum",
-  heritage_center: "Oberlin Heritage Center",
+  localist:         "Oberlin Localist",
+  amam:             "Allen Memorial Art Museum",
+  heritage_center:  "Oberlin Heritage Center",
+  apollo_theatre:   "Apollo Theatre",
+  oberlin_libcal:   "Oberlin College Libraries",
 };
 
 function fmt(ts: number) {
@@ -53,13 +73,15 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 export default function ReviewPage() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [edits, setEdits] = useState<Record<string, Edits>>({});
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [pushing, setPushing] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<string | null>(null); // only one card open at a time
+  const [edits, setEdits] = useState<Record<string, Edits>>({}); // in-memory field edits (unsaved)
+  const [selected, setSelected] = useState<Set<string>>(new Set()); // for bulk approve
+  const [pushing, setPushing] = useState<Set<string>>(new Set());   // IDs mid-push to CH
   const [pushResults, setPushResults] = useState<Record<string, PushResult>>({});
   const [saveStates, setSaveStates] = useState<Record<string, SaveState>>({});
-  // Persists across save() — tracks whether the user ever edited this item
+  // everEdited / everEditedFields survive a save() so the "writerEdited" flag
+  // written to Firestore on approval accurately reflects whether a human touched
+  // the AI's output — useful for measuring Writer Agent quality over time.
   const [everEdited, setEverEdited] = useState<Set<string>>(new Set());
   const [everEditedFields, setEverEditedFields] = useState<Record<string, Set<string>>>({});
 
