@@ -25,6 +25,7 @@ const SOURCES = [
   { id: "amam",            label: "Allen Memorial Art Museum" },
   { id: "heritage_center", label: "Oberlin Heritage Center"  },
   { id: "apollo_theatre",  label: "Apollo Theatre"           },
+  { id: "oberlin_libcal", label: "Oberlin College Libraries" },
 ];
 
 function timeAgo(iso: string) {

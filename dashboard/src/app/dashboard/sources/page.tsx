@@ -58,6 +58,14 @@ const SOURCES = [
     firestoreDoc: "apollo_theatre",
     description: "Movies playing at the Apollo Theatre in Oberlin — next 14 days",
   },
+  {
+    id: "oberlin_libcal",
+    name: "Oberlin College Libraries",
+    url: "oberlin.libcal.com/calendar/events",
+    workflow: "sync-oberlin-libcal.yml",
+    firestoreDoc: "oberlin_libcal",
+    description: "Library events, author talks, concerts, and public exhibitions",
+  },
 ];
 
 function timeAgo(iso: string) {
