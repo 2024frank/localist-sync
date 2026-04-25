@@ -181,16 +181,59 @@ function mightBeDuplicate(incoming, chEvent) {
   return chWords.some(w => inTitle.has(w));
 }
 
+// ─── Writer Agent helpers ─────────────────────────────────────────────────────
+
+function stripUrls(str) {
+  if (!str) return "";
+  return str
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/\b(streaming video|watch (the )?webcast|live stream|stream link|video link)\s*[:\-]?\s*/gi, "")
+    .split("\n").map(l => l.trim()).filter(l => l.length > 0).join(" ")
+    .replace(/\s{2,}/g, " ").trim();
+}
+
+function truncateAtSentence(str, max) {
+  if (!str) return "";
+  if (str.length <= max) return str;
+  const chunk = str.slice(0, max);
+  const lastPeriod = chunk.lastIndexOf(".");
+  if (lastPeriod > max * 0.5) return str.slice(0, lastPeriod + 1).trim();
+  return chunk.trimEnd();
+}
+
+async function geminiClean(rawText, maxChars) {
+  if (!GEMINI_API_KEY || !rawText) return null;
+  try {
+    return await geminiCall(`You are cleaning an event description for a community calendar.
+
+Instructions:
+- Remove ALL URLs (http/https links)
+- Remove streaming video references ("Streaming Video:", "Watch the webcast", "Live stream:", "Stream link:", "Video link:")
+- Summarize the result to under ${maxChars} characters
+- End at a complete sentence boundary (do not cut mid-sentence)
+- If the text is already clean and short enough, return it as-is
+- Return ONLY the cleaned text — no quotes, no explanation
+
+Description to clean:
+"""
+${rawText}
+"""`);
+  } catch (err) {
+    console.warn(`Writer Agent failed: ${err.message} — using fallback`);
+    return null;
+  }
+}
+
 // ─── Agent 3: Writer — CommunityHub payload builder ───────────────────────────
 
 /**
  * Build the CommunityHub POST payload from a staged event.
- * Uses simple field mapping — no Gemini cleaning here because sources using
- * this shared pipeline (AMAM, Heritage) already have clean text.
+ * Calls Gemini to clean and summarize the description (same as the Localist pipeline).
+ * Falls back to regex-based cleaning if Gemini is unavailable.
  *
  * contactEmail is always the owner's email — never pulled from the source event.
  */
-function buildWriterPayload(staged) {
+async function buildWriterPayload(staged) {
   // Convert ISO datetimes to Unix seconds (CommunityHub requires Unix)
   const startTime = staged.start_datetime
     ? Math.floor(new Date(staged.start_datetime).getTime() / 1000)
@@ -202,17 +245,30 @@ function buildWriterPayload(staged) {
   const isOnline = staged.location_type === "Online";
   const locationType = isOnline ? "on" : "ph2"; // CommunityHub location type codes
 
+  const rawDescription = (staged.extended_description || staged.short_description || "").slice(0, 2000);
+
+  let description = await geminiClean(rawDescription, 200);
+  let extendedDescription = await geminiClean(rawDescription, 1000);
+
+  if (!description) {
+    const cleaned = stripUrls(rawDescription);
+    description = truncateAtSentence(cleaned, 200) || "No description provided.";
+    extendedDescription = truncateAtSentence(cleaned, 1000);
+  }
+  description = description || "No description provided.";
+  extendedDescription = extendedDescription || description;
+
   const payload = {
-    eventType: "ot",           // "ot" = one-time event (vs recurring)
+    eventType: "ot",
     email: "frankkusiap@gmail.com",
     subscribe: true,
-    contactEmail: "frankkusiap@gmail.com",  // always owner email, ignore source
-    title: (staged.title || "Untitled Event").slice(0, 60), // CH enforces 60-char limit
+    contactEmail: "frankkusiap@gmail.com",
+    title: (staged.title || "Untitled Event").slice(0, 60),
     sponsors: [staged.organizational_sponsor || "Oberlin Community"],
-    postTypeId: [89],          // 89 = Other; individual sync scripts use richer mapping
+    postTypeId: [89],
     sessions: [{ startTime, endTime }],
-    description: staged.short_description || "No description provided.",
-    extendedDescription: staged.extended_description || staged.short_description || "",
+    description,
+    extendedDescription,
     locationType,
     display: "all",
     screensIds: [],
@@ -369,7 +425,7 @@ export async function runPipeline(stagedEvents, sourceId, sourceName) {
           photoUrl: staged._photoUrl || null,
           experience: staged.location_type === "Online" ? "virtual" : "inperson",
         },
-        writerPayload: buildWriterPayload(staged), // what will be sent to CH on approval
+        writerPayload: await buildWriterPayload(staged), // what will be sent to CH on approval
       });
     }
   }
