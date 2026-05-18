@@ -47,7 +47,7 @@ export default function SourcesPage() {
       .then(d => {
         setRuns(d.runs || []);
         if (d.has_active) {
-          pollRef.current = setTimeout(loadRuns, 2000);
+          pollRef.current = setTimeout(loadRuns, 1000);
         } else {
           loadSources();
         }
@@ -125,8 +125,11 @@ export default function SourcesPage() {
   async function stopRun(runId: number) {
     const freshToken = await getFreshToken();
     const res = await fetch(`/api/agent/runs/${runId}/stop`, { method: 'POST', headers: { Authorization: `Bearer ${freshToken}` } });
-    if (res.ok) { showToast('Run stopped'); loadRuns(); }
-    else showToast('Could not stop run');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) { showToast('Run stopped'); }
+    else if (res.status === 400) { showToast('Run already finished'); }
+    else { showToast(`Error: ${data.error || 'unknown'}`); }
+    loadRuns();
   }
 
   async function toggleActive(source: any) {
