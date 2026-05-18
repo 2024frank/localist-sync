@@ -4,17 +4,21 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { ClipboardList, CheckCircle, XCircle, Clock, ArrowRight, Wrench } from 'lucide-react';
+import OnboardingTour from '@/components/OnboardingTour';
 
 export default function ReviewerDashboardPage() {
   const { user, token, ready } = useAuth();
   const [data, setData]        = useState<any>(null);
   const [loading, setLoading]  = useState(true);
+  const [showTour, setShowTour] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     if (!ready || !token) return;
     fetch('/api/reviewer/dashboard', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json()).then(setData).finally(() => setLoading(false));
+    fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(d => { if (!d.onboarded) setShowTour(true); });
   }, [ready, token]);
 
   if (!ready || !user) return null;
@@ -26,6 +30,7 @@ export default function ReviewerDashboardPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fa' }}>
+      {showTour && <OnboardingTour role="reviewer" token={token} onDone={() => setShowTour(false)}/>}
       <Sidebar role={user.role} name={user.name} email={user.email} token={token} />
 
       <main style={{ flex: 1, padding: '2rem', maxWidth: 900 }}>

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { TrendingUp, CheckCircle, XCircle, Activity, Users } from 'lucide-react';
+import OnboardingTour from '@/components/OnboardingTour';
 
 export default function AdminStatsPage() {
   const { user, token, ready } = useAuth('admin');
@@ -13,6 +14,7 @@ export default function AdminStatsPage() {
   const [timeline, setTimeline] = useState<any[]>([]);
   const [activity, setActivity] = useState<any>(null);
   const [days, setDays]         = useState('30');
+  const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
     if (!ready || !token) return;
@@ -27,6 +29,7 @@ export default function AdminStatsPage() {
     ]).then(([s, src, r, f, t, act]) => {
       setStats(s); setSources(src); setReasons(r); setFields(f); setTimeline(t); setActivity(act);
     });
+    fetch('/api/users/me', { headers: h }).then(r => r.json()).then(d => { if (!d.onboarded) setShowTour(true); });
   }, [ready, token, days]);
 
   if (!ready || !user) return null;
@@ -34,6 +37,7 @@ export default function AdminStatsPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fa' }}>
+      {showTour && <OnboardingTour role="admin" token={token} onDone={() => setShowTour(false)}/>}
       <Sidebar role="admin" name={user.name} email={user.email} token={token} />
       <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
