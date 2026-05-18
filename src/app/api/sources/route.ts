@@ -18,9 +18,24 @@ export async function GET(req: NextRequest) {
           `SELECT status, finished_at FROM agent_runs
            WHERE source_id = ? ORDER BY started_at DESC LIMIT 1`, [s.id]
         ) as any;
-        return { ...s, ...counts, last_run_status: lastRun?.status || null, last_run_at: lastRun?.finished_at || null };
+
+        // For the Fixed Events source, attach correction stats
+        let fix_stats: any = null;
+        if (s.slug === 'fixed-events') {
+          const [[fs]] = await pool.query(
+            `SELECT
+               (SELECT COUNT(*) FROM needs_fix)                                             AS pending_fix,
+               (SELECT COUNT(*) FROM raw_events WHERE sent_for_correction = 1)              AS total_sent_for_fix,
+               (SELECT COUNT(*) FROM raw_events WHERE corrected_from_id IS NOT NULL)        AS total_fixed,
+               (SELECT COUNT(*) FROM raw_events WHERE corrected_from_id IS NOT NULL AND status = 'approved') AS fixed_approved
+            `
+          ) as any;
+          fix_stats = fs;
+        }
+
+        return { ...s, ...counts, last_run_status: lastRun?.status || null, last_run_at: lastRun?.finished_at || null, fix_stats };
       } catch {
-        return { ...s, total_events: 0, total_approved: 0, last_run_status: null, last_run_at: null };
+        return { ...s, total_events: 0, total_approved: 0, last_run_status: null, last_run_at: null, fix_stats: null };
       }
     }));
     return Response.json(enriched);

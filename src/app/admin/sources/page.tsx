@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import Sidebar from '@/components/layout/Sidebar';
-import { Plus, Play, Square, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Loader, Copy, Check, Pencil } from 'lucide-react';
+import { Plus, Play, Square, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Loader, Copy, Check, Pencil, Wrench } from 'lucide-react';
 
 const SCHEDULE_OPTIONS = [
   { label: 'Every hour',    value: '0 * * * *'   },
@@ -214,11 +214,21 @@ export default function SourcesPage() {
                   {sources.map(s => {
                     const run = latestRunBySource[s.id];
                     const isRunning = run?.status === 'running';
-                    const ingestUrl = `${APP_URL}/api/ingest/${s.slug}`;
+                    const isFixAgent = s.slug === 'fixed-events';
 
                     return (
-                      <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                        <td style={{ padding: '0.875rem 1rem', fontWeight: 600 }}>{s.name}</td>
+                      <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0', background: isFixAgent ? '#fffdf7' : undefined }}>
+                        <td style={{ padding: '0.875rem 1rem', fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {isFixAgent && <Wrench size={13} color="#c05e00"/>}
+                            {s.name}
+                            {isFixAgent && (
+                              <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: '#fff3e0', color: '#c05e00', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                Correction Agent
+                              </span>
+                            )}
+                          </div>
+                        </td>
 
                         {/* Ingest endpoint — copy button */}
                         <td style={{ padding: '0.875rem 1rem' }}>
@@ -267,7 +277,21 @@ export default function SourcesPage() {
                         </td>
 
                         <td style={{ padding: '0.875rem 1rem', fontSize: 12 }}>
-                          {run?.status === 'completed' ? (
+                          {isFixAgent ? (
+                            s.fix_stats ? (
+                              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                <span title="Currently awaiting correction" style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#c05e00', fontWeight: 600 }}>
+                                  <Wrench size={11}/> {s.fix_stats.pending_fix} pending
+                                </span>
+                                <span title="Total ever sent for correction" style={{ color: '#888' }}>
+                                  {s.fix_stats.total_sent_for_fix} sent
+                                </span>
+                                <span title="Fixed events approved" style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#3a8c3f' }}>
+                                  <CheckCircle size={11}/> {s.fix_stats.fixed_approved} approved
+                                </span>
+                              </div>
+                            ) : <span style={{ color: '#ddd' }}>—</span>
+                          ) : run?.status === 'completed' ? (
                             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               <CheckCircle size={12} color="#3a8c3f"/>
                               <span style={{ color: '#3a8c3f' }}>{run.events_extracted} new</span>
@@ -288,12 +312,16 @@ export default function SourcesPage() {
                         </td>
 
                         <td style={{ padding: '0.875rem 1rem' }}>
-                          <button onClick={() => triggerRun(s.id)}
-                            disabled={isRunning || triggering === s.id || !s.active}
-                            style={{ background: 'none', border: `1.5px solid ${isRunning ? '#ddd' : '#3a8c3f'}`, borderRadius: 6, padding: '0.3rem 0.65rem', cursor: isRunning ? 'default' : 'pointer', color: isRunning ? '#ccc' : '#3a8c3f', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {isRunning || triggering === s.id ? <Loader size={11} style={{ animation: 'spin 1s linear infinite' }}/> : <Play size={11}/>}
-                            {isRunning ? 'Running' : 'Run now'}
-                          </button>
+                          {isFixAgent ? (
+                            <span style={{ fontSize: 11, color: '#ccc', fontStyle: 'italic' }}>auto-triggered</span>
+                          ) : (
+                            <button onClick={() => triggerRun(s.id)}
+                              disabled={isRunning || triggering === s.id || !s.active}
+                              style={{ background: 'none', border: `1.5px solid ${isRunning ? '#ddd' : '#3a8c3f'}`, borderRadius: 6, padding: '0.3rem 0.65rem', cursor: isRunning ? 'default' : 'pointer', color: isRunning ? '#ccc' : '#3a8c3f', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              {isRunning || triggering === s.id ? <Loader size={11} style={{ animation: 'spin 1s linear infinite' }}/> : <Play size={11}/>}
+                              {isRunning ? 'Running' : 'Run now'}
+                            </button>
+                          )}
                         </td>
                         <td style={{ padding: '0.875rem 0.5rem' }}>
                           <button onClick={() => deleteSource(s)}
