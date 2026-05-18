@@ -48,7 +48,7 @@ export default function Sidebar({ role, name, email, token }: SidebarProps) {
         <div>
           <div style={{ fontSize: 10, fontWeight: 800, color: '#3a8c3f', letterSpacing: 0.8, lineHeight: 1.35 }}>AI EVENTS</div>
           <div style={{ fontSize: 10, fontWeight: 800, color: '#3a8c3f', letterSpacing: 0.8, lineHeight: 1.35 }}>AGGREGATOR</div>
-          <div style={{ fontSize: 9, color: '#bbb', marginTop: 1 }}>Oberlin Dashboard</div>
+          <div style={{ fontSize: 9, color: '#bbb', marginTop: 1 }}>CommunityHub</div>
         </div>
       </div>
 

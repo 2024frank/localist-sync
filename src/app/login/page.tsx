@@ -72,11 +72,11 @@ export default function LoginPage() {
           AI EVENTS AGGREGATOR
         </div>
         <div style={{ fontSize: 12, color: '#aaa', marginBottom: '2rem' }}>
-          Oberlin Environmental Dashboard
+          CommunityHub
         </div>
 
         <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: '1.75rem', color: '#111' }}>
-          AI EVENTS AGGREGATOR
+          Welcome
         </h1>
 
         {error && (
