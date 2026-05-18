@@ -57,7 +57,7 @@ describe('POST /api/sources', () => {
     const data = await res.json();
     expect(res.status).toBe(201);
     expect(data.name).toBe('Apollo Theatre');
-    expect(data.initial_fetch).toBe('triggered');
+    expect(data.initial_fetch).toBe('pending');
   });
 
   it('returns 409 for duplicate agent_id', async () => {
