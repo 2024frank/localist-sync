@@ -23,7 +23,8 @@ describe('GET /api/admin/stats', () => {
   it('returns summary stats', async () => {
     db.default.query
       .mockResolvedValueOnce([[MOCK_ADMIN]])
-      .mockResolvedValueOnce([[{ total_extracted: 50, total_approved: 35, total_rejected: 10, total_pending: 5, approval_rate: 70.0 }]]);
+      .mockResolvedValueOnce([[{ total_extracted: 50, total_approved: 35, total_rejected: 15, total_pending: 5 }]]) // live
+      .mockResolvedValueOnce([[{ total_extracted: 0,  total_approved: 0,  total_rejected: 0 }]]);                  // arch
 
     const res  = await GET(makeReq());
     const data = await res.json();

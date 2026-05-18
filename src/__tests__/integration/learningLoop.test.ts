@@ -393,7 +393,6 @@ describe('Stage 3 – Next agent run injects rejection history into agent messag
     db.default.query.mockReset();
     db.default.query
       .mockResolvedValueOnce([[SOURCE_FOR_NEXT_RUN]])    // sources SELECT
-      .mockResolvedValueOnce([{ insertId: 100 }])        // INSERT agent_runs
       .mockResolvedValueOnce([REJECTION_LOG_ROWS])       // rejection_log query
       .mockResolvedValueOnce([{ affectedRows: 1 }]);     // UPDATE agent_runs
 
@@ -411,7 +410,6 @@ describe('Stage 3 – Next agent run injects rejection history into agent messag
     db.default.query.mockReset();
     db.default.query
       .mockResolvedValueOnce([[SOURCE_FOR_NEXT_RUN]])
-      .mockResolvedValueOnce([{ insertId: 100 }])
       .mockResolvedValueOnce([REJECTION_LOG_ROWS])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
@@ -426,7 +424,6 @@ describe('Stage 3 – Next agent run injects rejection history into agent messag
     db.default.query.mockReset();
     db.default.query
       .mockResolvedValueOnce([[SOURCE_FOR_NEXT_RUN]])
-      .mockResolvedValueOnce([{ insertId: 101 }])
       .mockResolvedValueOnce([[]])              // empty rejection_log
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
@@ -440,8 +437,7 @@ describe('Stage 3 – Next agent run injects rejection history into agent messag
     db.default.query.mockReset();
     db.default.query
       .mockResolvedValueOnce([[SOURCE_FOR_NEXT_RUN]])
-      .mockResolvedValueOnce([{ insertId: 102 }])
-      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])              // empty rejection_log
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     await triggerAgentRun(SOURCE_ID, 100, 'test-key', 'test-env');
@@ -476,9 +472,8 @@ describe('Stage 3 – Next agent run injects rejection history into agent messag
     db.mockConn.query.mockResolvedValue([{ affectedRows: 1 }]);
     db.default.query
       .mockResolvedValueOnce([[SOURCE_FOR_NEXT_RUN]])
-      .mockResolvedValueOnce([{ insertId: 200 }])
-      .mockResolvedValueOnce([SOURCE_1_REJECTIONS])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([SOURCE_1_REJECTIONS])     // rejection_log
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);    // UPDATE agent_runs
 
     await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const msg1 = mockSessionsEventsSend.mock.calls[0][1].events[0].content[0].text as string;
@@ -486,12 +481,11 @@ describe('Stage 3 – Next agent run injects rejection history into agent messag
     // Run source 2
     db.default.query
       .mockResolvedValueOnce([[SOURCE_2]])
-      .mockResolvedValueOnce([{ insertId: 201 }])
-      .mockResolvedValueOnce([SOURCE_2_REJECTIONS])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([SOURCE_2_REJECTIONS])     // rejection_log
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);    // UPDATE agent_runs
 
     await triggerAgentRun(2, 99, 'test-key', 'test-env');
-    const msg2 = mockSessionsCreate.mock.calls[1][0].messages[0].content as string;
+    const msg2 = mockSessionsEventsSend.mock.calls[1][1].events[0].content[0].text as string;
 
     // Source 1's agent sees its own history
     expect(msg1).toContain('Oberlin Staff Meeting');
@@ -546,7 +540,6 @@ describe('Stage 4 – Complete cycle: Reject → History built → Agent learns'
 
     db.default.query
       .mockResolvedValueOnce([[SOURCE_FOR_NEXT_RUN]])
-      .mockResolvedValueOnce([{ insertId: 300 }])
       .mockResolvedValueOnce([rejectionInDb])   // rejection_log query
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 

@@ -79,10 +79,11 @@ describe('POST /api/users/invite', () => {
   it('creates a new reviewer and returns 201', async () => {
     const newUser = { id: 5, email: 'jane@oberlin.edu', full_name: 'Jane Smith', role: 'reviewer', active: 1 };
     db.default.query
-      .mockResolvedValueOnce([[ADMIN]])          // auth
-      .mockResolvedValueOnce([[]])               // existing email check → not found
-      .mockResolvedValueOnce([{ insertId: 5 }]) // INSERT users
-      .mockResolvedValueOnce([[newUser]]);        // SELECT created user
+      .mockResolvedValueOnce([[ADMIN]])               // auth
+      .mockResolvedValueOnce([[]])                    // existing email check → not found
+      .mockResolvedValueOnce([{ insertId: 5 }])       // INSERT users
+      .mockResolvedValueOnce([[{ pendingCount: 0 }]]) // pendingCount for welcome email
+      .mockResolvedValueOnce([[newUser]]);             // SELECT created user
 
     const res  = await POST(makeReq('POST', { email: 'jane@oberlin.edu', full_name: 'Jane Smith', role: 'reviewer' }));
     const data = await res.json();
@@ -97,6 +98,7 @@ describe('POST /api/users/invite', () => {
       .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ insertId: 5 }])
+      .mockResolvedValueOnce([[{ pendingCount: 0 }]])
       .mockResolvedValueOnce([[{ id: 5, email: 'jane@oberlin.edu', full_name: 'Jane', role: 'reviewer', active: 1 }]]);
 
     await POST(makeReq('POST', { email: '  JANE@Oberlin.EDU  ', full_name: 'Jane' }));
@@ -112,7 +114,8 @@ describe('POST /api/users/invite', () => {
       .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ insertId: 6 }])
-      .mockResolvedValueOnce([[]])  // INSERT reviewer_sources
+      .mockResolvedValueOnce([[]])                    // INSERT reviewer_sources
+      .mockResolvedValueOnce([[{ pendingCount: 0 }]]) // pendingCount for welcome email
       .mockResolvedValueOnce([[{ id: 6, email: 'x@o.edu', full_name: 'X', role: 'reviewer', active: 1 }]]);
 
     await POST(makeReq('POST', { email: 'x@o.edu', full_name: 'X', source_ids: [1, 2] }));
@@ -159,6 +162,7 @@ describe('POST /api/users/invite', () => {
       .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([{ insertId: 7 }])
+      .mockResolvedValueOnce([[{ pendingCount: 0 }]])
       .mockResolvedValueOnce([[{ id: 7, email: 'y@o.edu', full_name: 'Y', role: 'reviewer', active: 1 }]]);
 
     await POST(makeReq('POST', { email: 'y@o.edu', full_name: 'Y' }));

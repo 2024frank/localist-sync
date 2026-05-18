@@ -24,12 +24,13 @@ describe('GET /api/reviewer/dashboard', () => {
     mockVerify.mockResolvedValue({ uid: 'uid-rev', email: 'rev@oberlin.edu' });
     db.default.query
       .mockResolvedValueOnce([[REVIEWER]])                                    // getAuthUser
-      .mockResolvedValueOnce([[{ pending: 5 }]])                              // pending count
       .mockResolvedValueOnce([[{ id: 2 }]])                                   // db user lookup
-      .mockResolvedValueOnce([[{ total_reviewed: 20, total_approved: 15, total_rejected: 5, avg_time_sec: 42, approved_today: 3, rejected_today: 1 }]]) // personal stats
-      .mockResolvedValueOnce([[{ action: 'approved', title: 'Jazz Night', source_name: 'Apollo', created_at: new Date() }]]) // recent activity
-      .mockResolvedValueOnce([[{ id: 1, name: 'Apollo Theatre', slug: 'apollo', pending_count: 5 }]])  // assigned sources
-      .mockResolvedValueOnce([[{ title: 'Old Event', created_at: new Date(), source_name: 'Apollo' }]]); // oldest pending
+      .mockResolvedValueOnce([[{ pending: 5 }]])                              // pending count (Promise.all #1)
+      .mockResolvedValueOnce([[{ total_reviewed: 20, total_approved: 15, total_rejected: 5, avg_time_sec: 42, approved_today: 3, rejected_today: 1 }]]) // personalStats (#2)
+      .mockResolvedValueOnce([[{ corrections_approved: 2 }]])                 // corrections_approved (#3)
+      .mockResolvedValueOnce([[{ action: 'approved', title: 'Jazz Night', source_name: 'Apollo', created_at: new Date() }]]) // recentActivity (#4)
+      .mockResolvedValueOnce([[{ id: 1, name: 'Apollo Theatre', slug: 'apollo', pending_count: 5 }]])  // assignedSources (#5)
+      .mockResolvedValueOnce([[{ title: 'Old Event', created_at: new Date(), source_name: 'Apollo' }]]); // oldestPending (#6)
 
     const res  = await GET(makeReq());
     const data = await res.json();
@@ -46,9 +47,10 @@ describe('GET /api/reviewer/dashboard', () => {
     mockVerify.mockResolvedValue({ uid: 'uid-admin', email: 'admin@oberlin.edu' });
     db.default.query
       .mockResolvedValueOnce([[ADMIN]])
+      .mockResolvedValueOnce([[{ id: 1 }]])   // db user lookup
       .mockResolvedValueOnce([[{ pending: 12 }]])
-      .mockResolvedValueOnce([[{ id: 1 }]])
       .mockResolvedValueOnce([[{ total_reviewed: 0, total_approved: 0, total_rejected: 0, avg_time_sec: null, approved_today: 0, rejected_today: 0 }]])
+      .mockResolvedValueOnce([[{ corrections_approved: 0 }]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[null]]);
@@ -73,9 +75,10 @@ describe('GET /api/reviewer/dashboard', () => {
     mockVerify.mockResolvedValue({ uid: 'uid-rev', email: 'rev@oberlin.edu' });
     db.default.query
       .mockResolvedValueOnce([[REVIEWER]])
+      .mockResolvedValueOnce([[{ id: 2 }]])   // db user lookup
       .mockResolvedValueOnce([[{ pending: 0 }]])
-      .mockResolvedValueOnce([[{ id: 2 }]])
       .mockResolvedValueOnce([[{ total_reviewed: 10, total_approved: 10, total_rejected: 0, avg_time_sec: 30, approved_today: 0, rejected_today: 0 }]])
+      .mockResolvedValueOnce([[{ corrections_approved: 0 }]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[undefined]]);

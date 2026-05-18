@@ -65,7 +65,7 @@ describe('Email templates', () => {
     expect(call.to).toBe('new@oberlin.edu');
     expect(call.subject).toContain('reviewer');
     expect(call.html).toContain('New User');
-    expect(call.html).toContain('/login');
+    expect(call.html).toContain('/reviewer/queue');
   });
 
   it('sendAgentRunSummary includes source results and error details', async () => {

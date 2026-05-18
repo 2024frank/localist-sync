@@ -214,7 +214,7 @@ describe('triggerAgentRun — source validation', () => {
 describe('triggerAgentRun — agent failures', () => {
   beforeEach(setupPoolHappyPath);
 
-  it('marks run as failed when agent returns no JSON array', async () => {
+  it('treats no-JSON agent response as a direct-post run (success, 0 events)', async () => {
     mockSessionsEventsList.mockResolvedValue({
       data: [
         { type: 'agent.message', created_at: 'x', content: [{ type: 'text', text: 'No events found.' }] },
@@ -222,13 +222,14 @@ describe('triggerAgentRun — agent failures', () => {
       ],
     });
 
-    await expect(triggerAgentRun(1, 99, 'test-key', 'test-env'))
-      .rejects.toThrow('Agent returned no JSON array');
+    const result = await triggerAgentRun(1, 99, 'test-key', 'test-env');
+    expect(result.inserted).toBe(0);
+    expect(result.events).toHaveLength(0);
 
-    const failUpdate = db.default.query.mock.calls.find(
-      (c: any[]) => typeof c[0] === 'string' && c[0].includes("status='failed'")
+    const completedUpdate = db.default.query.mock.calls.find(
+      (c: any[]) => typeof c[0] === 'string' && c[0].includes("status='completed'")
     );
-    expect(failUpdate).toBeDefined();
+    expect(completedUpdate).toBeDefined();
   });
 
   it('marks run as failed when sessions.create throws', async () => {

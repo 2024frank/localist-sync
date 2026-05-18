@@ -22,13 +22,37 @@ export async function GET(req: NextRequest) {
   };
   const orderBy = ORDER_MAP[sort] || ORDER_MAP.ingested_asc;
 
-  let sourceClause = '';
   const params: any[] = [];
+  const clauses: string[] = [];
 
   if (source_id) {
-    sourceClause = ' AND re.source_id = ?';
+    clauses.push('re.source_id = ?');
     params.push(source_id);
   }
+
+  // Reviewers are scoped to their assigned sources (if any).
+  // Admins see everything. The subquery always references reviewer_sources so
+  // the clause is present regardless of whether assignments exist.
+  let scopeClause = '';
+  const scopeParams: any[] = [];
+  if (user.role === 'reviewer') {
+    scopeClause = `
+      AND (
+        NOT EXISTS (
+          SELECT 1 FROM reviewer_sources rs2
+          JOIN users u2 ON u2.id = rs2.reviewer_id
+          WHERE u2.firebase_uid = ?
+        )
+        OR re.source_id IN (
+          SELECT rs.source_id FROM reviewer_sources rs
+          JOIN users u ON u.id = rs.reviewer_id
+          WHERE u.firebase_uid = ?
+        )
+      )`;
+    scopeParams.push(user.uid, user.uid);
+  }
+
+  const extraClause = clauses.length ? ' AND ' + clauses.join(' AND ') : '';
 
   const [events] = await pool.query(
     `SELECT re.id, re.title, re.event_type, re.description, re.sessions,
@@ -37,16 +61,16 @@ export async function GET(req: NextRequest) {
             s.name AS source_name, s.slug AS source_slug
      FROM raw_events re
      JOIN sources s ON re.source_id = s.id
-     WHERE re.status IN ('pending','pending_fix') ${sourceClause}
+     WHERE re.status IN ('pending','pending_fix') ${scopeClause} ${extraClause}
      ORDER BY ${orderBy}
      LIMIT ? OFFSET ?`,
-    [...params, limit, page * limit]
+    [...scopeParams, ...params, limit, page * limit]
   ) as any;
 
   const [[{ total }]] = await pool.query(
     `SELECT COUNT(*) AS total FROM raw_events re
-     WHERE re.status IN ('pending','pending_fix') ${sourceClause}`,
-    params
+     WHERE re.status IN ('pending','pending_fix') ${scopeClause} ${extraClause}`,
+    [...scopeParams, ...params]
   ) as any;
 
   // Return the distinct sources that have pending events (for the filter dropdown)

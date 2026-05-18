@@ -167,8 +167,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockVerify.mockResolvedValue({ uid: 'uid-reviewer', email: 'reviewer@oberlin.edu' });
   mockFetch.mockResolvedValue({
-    json: jest.fn().mockResolvedValue({ id: 'ch_post_jazz_001' }),
     ok: true,
+    text: jest.fn().mockResolvedValue(JSON.stringify({ id: 'ch_post_default_001' })),
   });
   db.mockConn.beginTransaction = jest.fn().mockResolvedValue(undefined);
   db.mockConn.commit           = jest.fn().mockResolvedValue(undefined);
@@ -462,9 +462,7 @@ describe('Scenario 3 – Approve sends correct CommunityHub payload', () => {
   });
 
   it('sets submitted_to_ch=1 and records time_spent in review_sessions', async () => {
-    // Reset and re-apply mocks for this specific test
-    db.mockConn.query.mockReset();
-    db.mockConn.query.mockResolvedValue([{ affectedRows: 1 }]);
+    db.mockConn.query.mockClear(); // clear call history; keep mockResolvedValue from beforeEach
 
     await postAction(
       makeAuthReq('/api/review/events/10/action', 'POST', { action: 'approve', time_spent_sec: 42 }),
