@@ -82,7 +82,8 @@ export default function Sidebar({ role, name, email, token }: SidebarProps) {
 
   return (
     <aside style={{
-      width: w, minWidth: w, minHeight: '100vh',
+      width: w, minWidth: w, height: '100vh',
+      position: 'sticky', top: 0, alignSelf: 'flex-start',
       borderRight: '1px solid #e8f0e8',
       background: previewAsReviewer ? '#f8fff8' : '#fff',
       display: 'flex', flexDirection: 'column', flexShrink: 0,
