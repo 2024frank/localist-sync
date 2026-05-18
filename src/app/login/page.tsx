@@ -75,13 +75,9 @@ export default function LoginPage() {
           Oberlin Environmental Dashboard
         </div>
 
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6, color: '#111' }}>
-          Welcome back
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: '1.75rem', color: '#111' }}>
+          AI EVENTS AGGREGATOR
         </h1>
-        <p style={{ fontSize: 14, color: '#888', marginBottom: '1.75rem', lineHeight: 1.5 }}>
-          Sign in with your Google account.<br/>
-          Access is restricted to approved users.
-        </p>
 
         {error && (
           <div style={{
