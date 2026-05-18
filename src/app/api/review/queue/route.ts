@@ -25,17 +25,8 @@ export async function GET(req: NextRequest) {
   let sourceClause = '';
   const params: any[] = [];
 
-  if (user.role === 'reviewer') {
-    sourceClause = `AND re.source_id IN (
-      SELECT source_id FROM reviewer_sources WHERE reviewer_id = (
-        SELECT id FROM users WHERE firebase_uid = ?
-      )
-    )`;
-    params.push(user.uid);
-  }
-
   if (source_id) {
-    sourceClause += ' AND re.source_id = ?';
+    sourceClause = ' AND re.source_id = ?';
     params.push(source_id);
   }
 

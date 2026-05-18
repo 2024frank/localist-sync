@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import { useAuth } from '@/hooks/useAuth';
-import { ClipboardList, CheckCircle, XCircle, Clock, ArrowRight } from 'lucide-react';
+import { ClipboardList, CheckCircle, XCircle, Clock, ArrowRight, Wrench } from 'lucide-react';
 
 export default function ReviewerDashboardPage() {
   const { user, token, ready } = useAuth();
@@ -28,9 +28,9 @@ export default function ReviewerDashboardPage() {
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fa' }}>
       <Sidebar role={user.role} name={user.name} email={user.email} token={token} />
 
-      <main style={{ flex: 1, padding: '2rem', maxWidth: 860 }}>
+      <main style={{ flex: 1, padding: '2rem', maxWidth: 900 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: '0.25rem' }}>Your dashboard</h1>
-        <p style={{ fontSize: 13, color: '#888', marginBottom: '1.5rem' }}>Actionable items only</p>
+        <p style={{ fontSize: 13, color: '#888', marginBottom: '1.5rem' }}>Your personal review stats</p>
 
         {loading ? <div style={{ color: '#888', fontSize: 14 }}>Loading…</div> : (
           <>
@@ -63,18 +63,42 @@ export default function ReviewerDashboardPage() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+            {/* Row 1: today's numbers */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
               <StatCard label="Today approved" value={stats.approved_today || 0} color="#e8f5e9" textColor="#2a6b2e" icon={<CheckCircle size={16} color="#3a8c3f"/>}/>
               <StatCard label="Today rejected" value={stats.rejected_today || 0} color="#fdecea" textColor="#c0392b" icon={<XCircle size={16} color="#c0392b"/>}/>
               <StatCard label="Total reviewed" value={stats.total_reviewed || 0} color="#f8f9fa" textColor="#333" icon={<ClipboardList size={16} color="#666"/>}/>
               <StatCard label="Avg time (sec)"  value={stats.avg_time_sec  || '—'} color="#f8f9fa" textColor="#333" icon={<Clock size={16} color="#666"/>}/>
             </div>
 
+            {/* Row 2: correction stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+              <StatCard label="You approved"       value={stats.total_approved || 0}            color="#e8f5e9" textColor="#2a6b2e" icon={<CheckCircle size={16} color="#3a8c3f"/>}/>
+              <StatCard label="You rejected"        value={stats.total_rejected || 0}            color="#fdecea" textColor="#c0392b" icon={<XCircle size={16} color="#c0392b"/>}/>
+              <StatCard label="Sent for correction" value={stats.total_sent_for_correction || 0} color="#fff8f0" textColor="#c05e00" icon={<Wrench size={16} color="#e67e22"/>}/>
+            </div>
+
+            {/* Corrections approved highlight */}
+            {(stats.corrections_approved > 0 || stats.total_sent_for_correction > 0) && (
+              <div style={{ background: 'white', border: '1px solid #e8e8e8', borderRadius: 10, padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ background: '#e8f5e9', borderRadius: 8, padding: '0.5rem', display: 'flex' }}>
+                  <CheckCircle size={18} color="#3a8c3f"/>
+                </div>
+                <div>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: '#3a8c3f' }}>{stats.corrections_approved || 0}</span>
+                  <span style={{ fontSize: 13, color: '#555', marginLeft: 8 }}>
+                    of your {stats.total_sent_for_correction || 0} correction{stats.total_sent_for_correction !== 1 ? 's' : ''} came back and were approved
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+              {/* Sources — shared queue breakdown */}
               <div className="card">
-                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: '1rem' }}>Your sources</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: '1rem' }}>Queue by source</h3>
                 {sources.length === 0
-                  ? <p style={{ fontSize: 13, color: '#aaa' }}>All sources assigned</p>
+                  ? <p style={{ fontSize: 13, color: '#aaa' }}>No sources</p>
                   : sources.map((s: any) => (
                     <div key={s.id} onClick={() => router.push(`/reviewer/queue?source_id=${s.id}`)}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0', borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}>
@@ -87,15 +111,16 @@ export default function ReviewerDashboardPage() {
                 }
               </div>
 
+              {/* Recent activity — personal */}
               <div className="card">
-                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: '1rem' }}>Recent activity</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: '1rem' }}>Your recent activity</h3>
                 {recent.length === 0
                   ? <p style={{ fontSize: 13, color: '#aaa' }}>No activity yet</p>
                   : recent.slice(0, 8).map((r: any, i: number) => {
                     const meta: Record<string,{icon: React.ReactNode; label:string}> = {
                       approved:            { icon: <CheckCircle size={14} color="#3a8c3f"/>, label: 'Approved'     },
                       rejected:            { icon: <XCircle size={14} color="#c0392b"/>,    label: 'Rejected'     },
-                      sent_for_correction: { icon: <Clock size={14} color="#c05e00"/>,      label: 'Sent for fix' },
+                      sent_for_correction: { icon: <Wrench size={14} color="#c05e00"/>,     label: 'Sent for fix' },
                     };
                     const m = meta[r.action] || { icon: <Clock size={14} color="#aaa"/>, label: r.action };
                     return (

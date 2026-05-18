@@ -14,35 +14,23 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return unauthorized();
 
-  const isAdmin = user.role === 'admin';
-
-  // Source filter — reviewers scoped to their assignments
-  const sourceSubquery = isAdmin
-    ? ''
-    : `AND re.source_id IN (
-        SELECT source_id FROM reviewer_sources
-        WHERE reviewer_id = (SELECT id FROM users WHERE firebase_uid = ?)
-      )`;
-  const sourceParams = isAdmin ? [] : [user.uid];
-
-  // Pending count
+  // Pending count — global, all reviewers share the same queue
   const [[{ pending }]] = await pool.query(
-    `SELECT COUNT(*) AS pending FROM raw_events re
-     WHERE re.status = 'pending' ${sourceSubquery}`,
-    sourceParams
+    `SELECT COUNT(*) AS pending FROM raw_events WHERE status IN ('pending','pending_fix')`
   ) as any;
 
-  // Their personal stats
   const [[dbUser]] = await pool.query(
     'SELECT id FROM users WHERE firebase_uid = ?', [user.uid]
   ) as any;
   const userId = dbUser?.id;
 
+  // Personal stats: what this reviewer has done themselves
   const [[personalStats]] = await pool.query(
     `SELECT
        COUNT(*) AS total_reviewed,
        SUM(action = 'approved') AS total_approved,
        SUM(action = 'rejected') AS total_rejected,
+       SUM(action = 'sent_for_correction') AS total_sent_for_correction,
        ROUND(AVG(time_spent_sec), 1) AS avg_time_sec,
        SUM(action = 'approved' AND DATE(created_at) = CURDATE()) AS approved_today,
        SUM(action = 'rejected' AND DATE(created_at) = CURDATE()) AS rejected_today
@@ -50,7 +38,18 @@ export async function GET(req: NextRequest) {
     [userId]
   ) as any;
 
-  // Recent activity — last 10 actions
+  // Corrections that came back and were approved — events this reviewer sent for fix
+  // that a corrected version was subsequently approved
+  const [[{ corrections_approved }]] = await pool.query(
+    `SELECT COUNT(*) AS corrections_approved
+     FROM review_sessions rs
+     JOIN raw_events fixed ON fixed.corrected_from_id = rs.raw_event_id
+       AND fixed.status = 'approved'
+     WHERE rs.reviewer_id = ? AND rs.action = 'sent_for_correction'`,
+    [userId]
+  ) as any;
+
+  // Recent activity — last 10 actions by this reviewer
   const [recentActivity] = await pool.query(
     `SELECT rs.action, rs.time_spent_sec, rs.created_at,
             re.title, re.event_type, s.name AS source_name
@@ -62,32 +61,24 @@ export async function GET(req: NextRequest) {
     [userId]
   ) as any;
 
-  // Sources they cover
+  // All active sources with their pending counts (shared — same for everyone)
   const [assignedSources] = await pool.query(
-    isAdmin
-      ? `SELECT s.id, s.name, s.slug,
-           (SELECT COUNT(*) FROM raw_events WHERE source_id = s.id AND status = 'pending') AS pending_count
-         FROM sources s WHERE s.active = 1 ORDER BY s.name`
-      : `SELECT s.id, s.name, s.slug,
-           (SELECT COUNT(*) FROM raw_events WHERE source_id = s.id AND status = 'pending') AS pending_count
-         FROM sources s
-         JOIN reviewer_sources rs ON rs.source_id = s.id
-         WHERE rs.reviewer_id = ? AND s.active = 1 ORDER BY s.name`,
-    isAdmin ? [] : [userId]
+    `SELECT s.id, s.name, s.slug,
+       (SELECT COUNT(*) FROM raw_events WHERE source_id = s.id AND status IN ('pending','pending_fix')) AS pending_count
+     FROM sources s WHERE s.active = 1 ORDER BY s.name`
   ) as any;
 
-  // Oldest pending event (urgency signal)
+  // Oldest pending event (urgency signal — global)
   const [[oldestPending]] = await pool.query(
     `SELECT re.title, re.created_at, s.name AS source_name
      FROM raw_events re JOIN sources s ON re.source_id = s.id
-     WHERE re.status = 'pending' ${sourceSubquery}
-     ORDER BY re.created_at ASC LIMIT 1`,
-    sourceParams
+     WHERE re.status IN ('pending','pending_fix')
+     ORDER BY re.created_at ASC LIMIT 1`
   ) as any;
 
   return Response.json({
     pending,
-    personal_stats: personalStats,
+    personal_stats: { ...personalStats, corrections_approved },
     recent_activity: recentActivity,
     assigned_sources: assignedSources,
     oldest_pending: oldestPending || null,
