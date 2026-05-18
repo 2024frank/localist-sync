@@ -61,13 +61,13 @@ export async function GET(req: NextRequest) {
     []
   ) as any;
 
-  // System-wide counts today
+  // System-wide counts today — range predicates keep queries sargable (index-friendly)
   const [[today]] = await pool.query(
     `SELECT
        SUM(status = 'pending')  AS pending,
-       SUM(status = 'approved' AND DATE(updated_at) = CURDATE()) AS approved_today,
-       SUM(status = 'rejected' AND DATE(updated_at) = CURDATE()) AS rejected_today,
-       SUM(DATE(created_at) = CURDATE()) AS extracted_today
+       SUM(status = 'approved' AND updated_at >= CURDATE()) AS approved_today,
+       SUM(status = 'rejected' AND updated_at >= CURDATE()) AS rejected_today,
+       SUM(created_at >= CURDATE()) AS extracted_today
      FROM raw_events`,
     []
   ) as any;

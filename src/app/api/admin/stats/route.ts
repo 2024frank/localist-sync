@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const format    = searchParams.get('format')    || 'json';
 
   if (type === 'by-source') {
+    // last_run derived table avoids a correlated subquery per source row
     const [rows] = await pool.query(
       `SELECT s.id, s.name, s.slug, s.agent_id, s.active,
          COUNT(re.id)                                          AS total,
@@ -22,11 +23,16 @@ export async function GET(req: NextRequest) {
          SUM(re.status='pending')                             AS pending,
          ROUND(SUM(re.status='approved')/NULLIF(COUNT(re.id),0)*100,1) AS approval_rate,
          MAX(ar.finished_at)                                  AS last_run_at,
-         (SELECT status FROM agent_runs WHERE source_id=s.id ORDER BY started_at DESC LIMIT 1) AS last_run_status
+         lr.status                                            AS last_run_status
        FROM sources s
        LEFT JOIN raw_events re ON re.source_id=s.id AND re.created_at >= NOW() - INTERVAL ? DAY
        LEFT JOIN agent_runs ar ON ar.source_id=s.id
-       GROUP BY s.id ORDER BY s.name ASC`,
+       LEFT JOIN (
+         SELECT source_id, status
+         FROM agent_runs a1
+         WHERE started_at = (SELECT MAX(started_at) FROM agent_runs a2 WHERE a2.source_id = a1.source_id)
+       ) lr ON lr.source_id = s.id
+       GROUP BY s.id, lr.status ORDER BY s.name ASC`,
       [days]
     ) as any;
     return Response.json(rows);
