@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, getAuth } from 'firebase/auth';
-import '@/lib/firebase'; // ensure firebase is initialized
+import { getAuth, onIdTokenChanged } from 'firebase/auth';
+import '@/lib/firebase';
 
 export interface AppUser {
   id:    number;
@@ -20,41 +20,43 @@ export function useAuth(requiredRole?: 'admin' | 'reviewer') {
   useEffect(() => {
     const auth = getAuth();
 
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+    // onIdTokenChanged fires on login AND whenever Firebase auto-refreshes the token
+    const unsub = onIdTokenChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
-        // Not signed in — redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         router.push('/login');
         return;
       }
 
-      try {
-        // Always get a fresh token — Firebase auto-refreshes if expired
-        const freshToken = await firebaseUser.getIdToken(false);
+      // Get fresh token
+      const freshToken = await firebaseUser.getIdToken();
+      localStorage.setItem('token', freshToken);
+      setToken(freshToken);
 
-        // Verify against our DB and get role
+      // Use stored user data — only fetch from DB if not cached
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as AppUser;
+          if (requiredRole && parsed.role !== requiredRole && !(requiredRole === 'reviewer' && parsed.role === 'admin')) {
+            router.push('/login');
+            return;
+          }
+          setUser(parsed);
+          setReady(true);
+          return;
+        } catch {}
+      }
+
+      // No cached user — fetch from DB once
+      try {
         const res = await fetch('/api/auth/me', {
           headers: { Authorization: `Bearer ${freshToken}` },
         });
-
-        if (!res.ok) {
-          router.push('/login');
-          return;
-        }
-
+        if (!res.ok) { router.push('/login'); return; }
         const userData = await res.json() as AppUser;
-
-        if (requiredRole && userData.role !== requiredRole && !(requiredRole === 'reviewer' && userData.role === 'admin')) {
-          router.push('/login');
-          return;
-        }
-
-        // Store fresh token and user
-        localStorage.setItem('token', freshToken);
         localStorage.setItem('user', JSON.stringify(userData));
-
-        setToken(freshToken);
         setUser(userData);
         setReady(true);
       } catch {
@@ -65,19 +67,15 @@ export function useAuth(requiredRole?: 'admin' | 'reviewer') {
     return () => unsub();
   }, []); // eslint-disable-line
 
-  // Helper to get a guaranteed fresh token for API calls
+  // Call this before any important API request to guarantee fresh token
   async function getFreshToken(): Promise<string> {
     const auth = getAuth();
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return token;
-    try {
-      const fresh = await firebaseUser.getIdToken(false);
-      setToken(fresh);
-      localStorage.setItem('token', fresh);
-      return fresh;
-    } catch {
-      return token;
-    }
+    const fresh = await firebaseUser.getIdToken(true); // force refresh
+    localStorage.setItem('token', fresh);
+    setToken(fresh);
+    return fresh;
   }
 
   return { user, token, ready, getFreshToken };
