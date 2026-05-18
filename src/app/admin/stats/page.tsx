@@ -34,7 +34,7 @@ export default function AdminStatsPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fa' }}>
-      <Sidebar role="admin" name={user.name} email={user.email} />
+      <Sidebar role="admin" name={user.name} email={user.email} token={token} />
       <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
           <h1 style={{ fontSize: 22, fontWeight: 700 }}>Dashboard</h1>

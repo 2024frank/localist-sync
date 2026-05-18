@@ -1,93 +1,99 @@
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/events/route';
-import { adminAuth } from '@/lib/firebase-admin';
 
-const db         = require('@/lib/db');
-const mockVerify = adminAuth.verifyIdToken as jest.Mock;
-
-const ADMIN    = { id: 1, email: 'admin@oberlin.edu', role: 'admin',    full_name: 'Admin', active: 1, firebase_uid: 'uid-admin' };
-const REVIEWER = { id: 2, email: 'rev@oberlin.edu',   role: 'reviewer', full_name: 'Rev',   active: 1, firebase_uid: 'uid-rev' };
+const db = require('@/lib/db');
 
 const EVENTS = [
-  { id: 1, title: 'Jazz Night',           status: 'pending',  event_type: 'ot' },
-  { id: 2, title: 'City Council Meeting', status: 'approved', event_type: 'ot' },
-  { id: 3, title: 'Job Opening',          status: 'rejected', event_type: 'jp' },
+  { id: 1, title: 'Jazz Night',           status: 'pending',  event_type: 'ot', sponsors: '[]', post_type_ids: '[]', sessions: '[]', buttons: '[]' },
+  { id: 2, title: 'City Council Meeting', status: 'approved', event_type: 'ot', sponsors: '[]', post_type_ids: '[]', sessions: '[]', buttons: '[]' },
+  { id: 3, title: 'Job Opening',          status: 'rejected', event_type: 'jp', sponsors: '[]', post_type_ids: '[]', sessions: '[]', buttons: '[]' },
 ];
 
 function makeReq(params: Record<string, string> = {}) {
   const url = new URL('http://localhost/api/events');
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  return new NextRequest(url, { headers: { Authorization: 'Bearer valid' } });
+  return new NextRequest(url);
 }
 
 beforeEach(() => {
   db.default.query.mockReset();
-  mockVerify.mockReset();
-  mockVerify.mockResolvedValue({ uid: 'uid-admin', email: 'admin@oberlin.edu' });
 });
 
-describe('GET /api/events', () => {
+describe('GET /api/events (public — no auth required)', () => {
   it('returns all events with pagination', async () => {
     db.default.query
-      .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[{ total: 3 }]])
       .mockResolvedValueOnce([EVENTS]);
 
-    const data = await (await GET(makeReq())).json();
+    const res  = await GET(makeReq());
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
     expect(data.events).toHaveLength(3);
     expect(data.pagination.total).toBe(3);
     expect(data.pagination.has_next).toBe(false);
     expect(data.pagination.has_prev).toBe(false);
   });
 
+  it('returns CORS headers', async () => {
+    db.default.query
+      .mockResolvedValueOnce([[{ total: 0 }]])
+      .mockResolvedValueOnce([[]]);
+
+    const res = await GET(makeReq());
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+  });
+
   it('filters by status', async () => {
     db.default.query
-      .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[{ total: 1 }]])
       .mockResolvedValueOnce([[EVENTS[1]]]);
 
     await GET(makeReq({ status: 'approved' }));
-    const eventsQuery = db.default.query.mock.calls[2];
-    expect(eventsQuery[0]).toContain('re.status = ?');
-    expect(eventsQuery[1]).toContain('approved');
+    expect(db.default.query.mock.calls[1][0]).toContain('re.status = ?');
+    expect(db.default.query.mock.calls[1][1]).toContain('approved');
   });
 
   it('filters by source_id', async () => {
     db.default.query
-      .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[{ total: 1 }]])
       .mockResolvedValueOnce([[EVENTS[0]]]);
 
     await GET(makeReq({ source_id: '1' }));
-    expect(db.default.query.mock.calls[2][0]).toContain('re.source_id = ?');
+    expect(db.default.query.mock.calls[1][0]).toContain('re.source_id = ?');
+  });
+
+  it('filters by source_slug', async () => {
+    db.default.query
+      .mockResolvedValueOnce([[{ total: 1 }]])
+      .mockResolvedValueOnce([[EVENTS[0]]]);
+
+    await GET(makeReq({ source_slug: 'oberlin-college' }));
+    expect(db.default.query.mock.calls[1][0]).toContain('s.slug = ?');
   });
 
   it('searches title with LIKE', async () => {
     db.default.query
-      .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[{ total: 1 }]])
       .mockResolvedValueOnce([[EVENTS[0]]]);
 
     await GET(makeReq({ q: 'jazz' }));
-    const eventsQuery = db.default.query.mock.calls[2];
-    expect(eventsQuery[0]).toContain('LIKE ?');
-    expect(eventsQuery[1]).toContain('%jazz%');
+    expect(db.default.query.mock.calls[1][0]).toContain('LIKE ?');
+    expect(db.default.query.mock.calls[1][1]).toContain('%jazz%');
   });
 
   it('caps limit at 100', async () => {
     db.default.query
-      .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[{ total: 0 }]])
       .mockResolvedValueOnce([[]]);
 
     await GET(makeReq({ limit: '9999' }));
-    const params = db.default.query.mock.calls[2][1];
+    const params = db.default.query.mock.calls[1][1];
     expect(params[params.length - 2]).toBe(100);
   });
 
   it('calculates pagination correctly', async () => {
     db.default.query
-      .mockResolvedValueOnce([[ADMIN]])
       .mockResolvedValueOnce([[{ total: 55 }]])
       .mockResolvedValueOnce([EVENTS]);
 
@@ -97,32 +103,13 @@ describe('GET /api/events', () => {
     expect(data.pagination.has_next).toBe(true);
   });
 
-  it('returns 401 without token', async () => {
-    mockVerify.mockRejectedValueOnce(new Error('invalid'));
-    expect((await GET(new NextRequest('http://localhost/api/events', {}))).status).toBe(401);
-  });
-
-  it('adds reviewer_sources filter for reviewer role', async () => {
-    mockVerify.mockResolvedValue({ uid: 'uid-rev', email: 'rev@oberlin.edu' });
+  it('parses JSON fields in response', async () => {
     db.default.query
-      .mockResolvedValueOnce([[REVIEWER]])
       .mockResolvedValueOnce([[{ total: 1 }]])
       .mockResolvedValueOnce([[EVENTS[0]]]);
 
-    await GET(makeReq());
-    // getAuthUser is call[0], count is call[1] — both should include reviewer_sources
-    expect(db.default.query.mock.calls).toHaveLength(3);
-    expect(db.default.query.mock.calls[1][0]).toContain('reviewer_sources');
-  });
-
-  it('echoes filters in response', async () => {
-    db.default.query
-      .mockResolvedValueOnce([[ADMIN]])
-      .mockResolvedValueOnce([[{ total: 0 }]])
-      .mockResolvedValueOnce([[]]);
-
-    const data = await (await GET(makeReq({ status: 'pending', geo_scope: 'city_wide' }))).json();
-    expect(data.filters.status).toBe('pending');
-    expect(data.filters.geo_scope).toBe('city_wide');
+    const data = await (await GET(makeReq())).json();
+    expect(Array.isArray(data.events[0].sponsors)).toBe(true);
+    expect(Array.isArray(data.events[0].sessions)).toBe(true);
   });
 });

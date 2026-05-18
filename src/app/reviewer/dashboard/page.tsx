@@ -26,7 +26,7 @@ export default function ReviewerDashboardPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fa' }}>
-      <Sidebar role={user.role} name={user.name} email={user.email} />
+      <Sidebar role={user.role} name={user.name} email={user.email} token={token} />
 
       <main style={{ flex: 1, padding: '2rem', maxWidth: 860 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: '0.25rem' }}>Your dashboard</h1>

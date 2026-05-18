@@ -51,7 +51,7 @@ export default function UsersPage() {
 
   return (
     <div style={{ display:'flex', minHeight:'100vh', background:'#f8f9fa' }}>
-      <Sidebar role="admin" name={user.name} email={user.email} />
+      <Sidebar role="admin" name={user.name} email={user.email} token={token} />
       <main style={{ flex:1, padding:'2rem' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'1.5rem' }}>
           <div>

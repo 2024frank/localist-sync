@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Clock, Globe, Calendar } from 'lucide-react';
+import { formatDateTime } from '@/lib/timezone';
 
 const GEO_COLORS: Record<string,string> = {
   hyper_local: '#e8f5e9|#2a6b2e', city_wide: '#e3f2fd|#1565c0',
@@ -33,15 +34,15 @@ export default function ReviewerQueuePage() {
 
   function formatDate(sessions: string) {
     try {
-      const s = JSON.parse(sessions);
+      const s = typeof sessions === 'string' ? JSON.parse(sessions) : sessions;
       if (!s?.[0]?.startTime) return '—';
-      return new Date(s[0].startTime * 1000).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      return formatDateTime(s[0].startTime, { short: true, dateOnly: true });
     } catch { return '—'; }
   }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f9fa' }}>
-      <Sidebar role={user.role} name={user.name} email={user.email} />
+      <Sidebar role={user.role} name={user.name} email={user.email} token={token} />
       <main style={{ flex: 1, padding: '2rem' }}>
         <div style={{ marginBottom: '1.5rem' }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Review queue</h1>
