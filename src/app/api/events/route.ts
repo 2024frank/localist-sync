@@ -1,8 +1,12 @@
 import { NextRequest } from 'next/server';
 import pool from '@/lib/db';
 
-// Public endpoint — NO authentication required.
-// Full documentation in docs/api.md
+const CORS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+};
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
 
@@ -58,13 +62,7 @@ export async function GET(req: NextRequest) {
     [...params, limit, page * limit]
   ) as any;
 
-  const parsed = events.map((ev: any) => ({
-    ...ev,
-    sponsors:      safeJson(ev.sponsors,      []),
-    post_type_ids: safeJson(ev.post_type_ids, []),
-    sessions:      safeJson(ev.sessions,      []),
-    buttons:       safeJson(ev.buttons,       []),
-  }));
+  const parsed = events.map(parseEvent);
 
   return Response.json({
     events: parsed,
@@ -75,26 +73,30 @@ export async function GET(req: NextRequest) {
       has_prev: page > 0,
     },
     filters: { status, source_id, source_slug, event_type, geo_scope, from, to, q, order },
-  }, {
-    headers: {
-      'Access-Control-Allow-Origin':  '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-    },
-  });
+  }, { headers: CORS });
 }
 
 export async function OPTIONS() {
-  return new Response(null, {
-    headers: {
-      'Access-Control-Allow-Origin':  '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+  return new Response(null, { headers: CORS });
 }
 
-function safeJson(val: any, fallback: any) {
-  if (Array.isArray(val) || (val && typeof val === 'object')) return val;
-  try { return JSON.parse(val); } catch { return fallback; }
+// Parse all JSON fields so consumers always get proper arrays/objects
+function parseEvent(ev: any) {
+  return {
+    ...ev,
+    sponsors:      parseJsonField(ev.sponsors,      []),
+    post_type_ids: parseJsonField(ev.post_type_ids, []),
+    sessions:      parseJsonField(ev.sessions,      []),
+    buttons:       parseJsonField(ev.buttons,       []),
+    geo_json:      parseJsonField(ev.geo_json,      null),
+  };
+}
+
+function parseJsonField(val: any, fallback: any): any {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'object') return val;          // already parsed by MySQL driver
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return fallback; }
+  }
+  return fallback;
 }

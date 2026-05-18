@@ -14,7 +14,18 @@ export async function GET(
      FROM raw_events re JOIN sources s ON re.source_id = s.id WHERE re.id = ?`, [id]
   ) as any;
   if (!event) return Response.json({ error: 'Not found' }, { status: 404 });
-  return Response.json(event);
+
+  // Parse JSON fields
+  const parsed = {
+    ...event,
+    sponsors:      pj(event.sponsors,      []),
+    post_type_ids: pj(event.post_type_ids, []),
+    sessions:      pj(event.sessions,      []),
+    buttons:       pj(event.buttons,       []),
+    geo_json:      pj(event.geo_json,      null),
+  };
+
+  return Response.json(parsed, { headers: { 'Access-Control-Allow-Origin': '*' } });
 }
 
 export async function PATCH(
@@ -72,4 +83,10 @@ export async function PATCH(
   } finally {
     (conn as any).release();
   }
+}
+
+function pj(val: any, fallback: any): any {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'object') return val;
+  try { return JSON.parse(val); } catch { return fallback; }
 }
