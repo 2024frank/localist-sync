@@ -73,6 +73,17 @@ export async function POST(
       }
     }
 
+    // Persist edits back to raw_events so the DB reflects what was approved
+    const updateFields = editableFields.filter(f => edits[f] !== undefined);
+    if (updateFields.length > 0) {
+      const setClauses = updateFields.map(f => `${f} = ?`);
+      const setVals: any[] = updateFields.map(f =>
+        typeof edits[f] === 'object' ? JSON.stringify(edits[f]) : String(edits[f])
+      );
+      setVals.push(eventId);
+      await conn.query(`UPDATE raw_events SET ${setClauses.join(', ')} WHERE id = ?`, setVals);
+    }
+
     const merged = { ...event, ...edits };
     const payload: any = {
       eventType: merged.event_type, email: process.env.COMMUNITYHUB_EMAIL || 'fkusiapp@oberlin.edu',

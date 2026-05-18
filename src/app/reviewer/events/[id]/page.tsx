@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useParams, useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
-import { ExternalLink, Check, X } from 'lucide-react';
-import { formatSessionRange, getTimezoneLabel } from '@/lib/timezone';
+import { ExternalLink, Check, X, Plus, Trash2, Save } from 'lucide-react';
+import { getTimezoneLabel } from '@/lib/timezone';
 
 const REASON_CODES = [
   { code: 'wrong_audience',           label: 'Wrong audience (staff/students only)' },
@@ -23,6 +23,37 @@ const LOCATION_TYPES  = ['ph2','on','bo','ne'];
 const LOCATION_LABELS: Record<string,string> = { ph2:'In-person', on:'Online', bo:'Hybrid', ne:'None' };
 const GEO_SCOPES      = ['hyper_local','city_wide','county','regional'];
 const GEO_LABELS: Record<string,string> = { hyper_local:'Hyper-local', city_wide:'City-wide', county:'County', regional:'Regional' };
+const EVENT_TYPES     = [['ot','Event'],['an','Announcement'],['jp','Job posting']] as const;
+const DISPLAY_OPTIONS = [['all','All screens'],['ps','Primary'],['sps','Secondary'],['ss','Single']] as const;
+const POST_TYPES = [
+  { id:1,  label:'Volunteer Opportunity' },
+  { id:2,  label:'Exhibit' },
+  { id:3,  label:'Fair / Festival / Celebration' },
+  { id:4,  label:'Tour / Open House' },
+  { id:5,  label:'Film' },
+  { id:6,  label:'Presentation / Lecture' },
+  { id:7,  label:'Workshop / Class' },
+  { id:8,  label:'Music Performance' },
+  { id:9,  label:'Theatre / Dance' },
+  { id:10, label:'City Government' },
+  { id:11, label:'Spectator Sport' },
+  { id:12, label:'Participatory Sport / Game' },
+  { id:13, label:'Networking Event' },
+  { id:59, label:'Ecolympics / Environmental' },
+  { id:89, label:'Other' },
+];
+
+function toDatetimeLocal(unixSeconds: number): string {
+  if (!unixSeconds) return '';
+  const d = new Date(unixSeconds * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromDatetimeLocal(val: string): number {
+  if (!val) return 0;
+  return Math.floor(new Date(val).getTime() / 1000);
+}
 
 export default function ReviewEventPage() {
   const { user, token: authToken, ready } = useAuth();
@@ -36,8 +67,9 @@ export default function ReviewEventPage() {
   const [reasons, setReasons]       = useState<string[]>([]);
   const [note, setNote]             = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving]         = useState(false);
   const [toast, setToast]           = useState('');
-  const [tzLabel]                    = useState(getTimezoneLabel);
+  const [tzLabel]                   = useState(getTimezoneLabel);
 
   useEffect(() => { startMsRef.current = Date.now(); }, []);
 
@@ -51,9 +83,51 @@ export default function ReviewEventPage() {
     return edits[key] !== undefined ? edits[key] : (event?.[key] ?? '');
   }
   function set(key: string, val: any) { setEdits(e => ({ ...e, [key]: val })); }
-  function parseJson(val: any) {
-    if (typeof val === 'string') { try { return JSON.parse(val); } catch { return []; } }
-    return val || [];
+  function parseJson(val: any, fallback: any = []) {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'string') { try { return JSON.parse(val); } catch { return fallback; } }
+    return val;
+  }
+
+  // Sessions
+  const editSessions: Array<{startTime: number, endTime: number}> = parseJson(field('sessions'));
+  function updateSession(i: number, key: 'startTime'|'endTime', val: string) {
+    set('sessions', editSessions.map((s, idx) => idx === i ? { ...s, [key]: fromDatetimeLocal(val) } : s));
+  }
+  function addSession() { set('sessions', [...editSessions, { startTime: 0, endTime: 0 }]); }
+  function removeSession(i: number) { set('sessions', editSessions.filter((_, idx) => idx !== i)); }
+
+  // Buttons
+  const editButtons: Array<{title: string, link: string}> = parseJson(field('buttons'), []);
+  function updateButton(i: number, key: 'title'|'link', val: string) {
+    set('buttons', editButtons.map((b, idx) => idx === i ? { ...b, [key]: val } : b));
+  }
+  function addButton() { set('buttons', [...editButtons, { title: '', link: '' }]); }
+  function removeButton(i: number) { set('buttons', editButtons.filter((_, idx) => idx !== i)); }
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3500);
+  }
+
+  async function saveEdits() {
+    if (!Object.keys(edits).length) return;
+    setSaving(true);
+    const res = await fetch(`/api/events/${id}/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ edits }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setEvent(data.event);
+      setEdits({});
+      showToast(`✓ Saved${data.changed_fields.length ? ': ' + data.changed_fields.join(', ') : ''}`);
+    } else {
+      const d = await res.json().catch(() => ({}));
+      showToast(`Error: ${d.error || 'Save failed'}`);
+    }
+    setSaving(false);
   }
 
   async function approve() {
@@ -65,11 +139,11 @@ export default function ReviewEventPage() {
       body: JSON.stringify({ action: 'approve', edits, time_spent_sec }),
     });
     if (res.ok) {
-      setToast('✓ Approved and submitted to CommunityHub');
+      showToast('✓ Approved and submitted to CommunityHub');
       setTimeout(() => router.push('/reviewer/queue'), 1200);
     } else {
-      const d = await res.json();
-      setToast(`Error: ${d.error || 'Please try again'}`);
+      const d = await res.json().catch(() => ({}));
+      showToast(`Error: ${d.error || 'Please try again'}`);
       setSubmitting(false);
     }
   }
@@ -83,7 +157,7 @@ export default function ReviewEventPage() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
       body: JSON.stringify({ action: 'reject', edits: { reason_codes: reasons, reviewer_note: note }, time_spent_sec }),
     });
-    setToast('Event rejected');
+    showToast('Event rejected');
     setTimeout(() => router.push('/reviewer/queue'), 1000);
   }
 
@@ -96,13 +170,14 @@ export default function ReviewEventPage() {
     </div>
   );
 
-  const sessions = parseJson(event.sessions);
+  const hasEdits    = Object.keys(edits).length > 0;
+  const postTypeIds: number[] = parseJson(field('post_type_ids'), []);
 
   return (
     <div style={{ display:'flex', minHeight:'100vh', background:'#f8f9fa' }}>
       <Sidebar role={user.role} name={user.name} email={user.email} token={authToken}/>
 
-      <main style={{ flex:1, padding:'2rem', maxWidth:780 }}>
+      <main style={{ flex:1, padding:'2rem', maxWidth:840 }}>
         {toast && (
           <div style={{ position:'fixed', top:20, right:20, background: toast.startsWith('Error') ? '#c0392b' : '#3a8c3f', color:'white', padding:'0.75rem 1.25rem', borderRadius:8, fontSize:13, fontWeight:500, zIndex:999 }}>
             {toast}
@@ -114,7 +189,11 @@ export default function ReviewEventPage() {
             <button onClick={() => router.push('/reviewer/queue')} style={{ background:'none', border:'none', cursor:'pointer', color:'#888', fontSize:12, padding:0, marginBottom:6 }}>← Back to queue</button>
             <h1 style={{ fontSize:20, fontWeight:700 }}>Review event</h1>
           </div>
-          <div style={{ display:'flex', gap:8 }}>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
+            <button onClick={saveEdits} disabled={!hasEdits || saving} className="btn-ghost"
+              style={{ fontSize:13, display:'flex', alignItems:'center', gap:5, opacity: hasEdits ? 1 : 0.4 }}>
+              <Save size={14}/> {saving ? 'Saving…' : 'Save edits'}
+            </button>
             <button onClick={() => setShowReject(true)} disabled={submitting} className="btn-ghost"
               style={{ fontSize:13, display:'flex', alignItems:'center', gap:5, borderColor:'#c0392b', color:'#c0392b' }}>
               <X size={14}/> Reject
@@ -126,7 +205,7 @@ export default function ReviewEventPage() {
           </div>
         </div>
 
-        {/* Source info */}
+        {/* Source info bar */}
         <div style={{ background:'#e8f5e9', borderRadius:8, padding:'0.75rem 1rem', marginBottom:'1.25rem', fontSize:12, display:'flex', gap:16, alignItems:'center' }}>
           <span style={{ fontWeight:600, color:'#2a6b2e' }}>{event.source_name}</span>
           {event.calendar_source_url && (
@@ -136,10 +215,19 @@ export default function ReviewEventPage() {
             </a>
           )}
           <span style={{ color:'#666' }}>Received: {new Date(event.created_at).toLocaleDateString()}</span>
-          {tzLabel && <span style={{ color:'#aaa', marginLeft:'auto', fontSize:11 }}>Times shown in {tzLabel}</span>}
+          {tzLabel && <span style={{ color:'#aaa', marginLeft:'auto', fontSize:11 }}>Times in {tzLabel}</span>}
         </div>
 
-        <div className="card" style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+        {/* Basic Info */}
+        <SectionCard title="Basic Info">
+          <Field label="Event type">
+            <div style={{ display:'flex', gap:6 }}>
+              {EVENT_TYPES.map(([val, lbl]) => (
+                <ToggleBtn key={val} active={field('event_type')===val} onClick={()=>set('event_type',val)}>{lbl}</ToggleBtn>
+              ))}
+            </div>
+          </Field>
+
           <Field label={`Title (${(field('title')?.length||0)}/60 chars)`}>
             <input value={field('title')} onChange={e=>set('title',e.target.value)} maxLength={60} style={inputStyle}/>
           </Field>
@@ -151,37 +239,57 @@ export default function ReviewEventPage() {
           <Field label="Long description (max 1000 chars)">
             <textarea value={field('extended_description')||''} onChange={e=>set('extended_description',e.target.value)} maxLength={1000} rows={4} style={{...inputStyle,resize:'vertical'}}/>
           </Field>
+        </SectionCard>
 
-          {/* Date/time — shown in reviewer's local timezone */}
-          {sessions.length > 0 && (
-            <Field label="Date & time (your local timezone)">
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                {sessions.map((s: any, i: number) => (
-                  <div key={i} style={{ fontSize:13, color:'#333', padding:'0.4rem 0.6rem', background:'#f8f9fa', borderRadius:6 }}>
-                    {formatSessionRange(s.startTime, s.endTime)}
-                  </div>
-                ))}
-                {sessions.length > 1 && (
-                  <div style={{ fontSize:11, color:'#aaa' }}>{sessions.length} sessions total</div>
-                )}
+        {/* Date & Time */}
+        <SectionCard title="Date & Time">
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {editSessions.map((s, i) => (
+              <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 1fr auto', gap:8, alignItems:'flex-end' }}>
+                <Field label={`Session ${i+1} — Start`}>
+                  <input type="datetime-local" value={toDatetimeLocal(s.startTime)}
+                    onChange={e=>updateSession(i,'startTime',e.target.value)} style={inputStyle}/>
+                </Field>
+                <Field label="End">
+                  <input type="datetime-local" value={toDatetimeLocal(s.endTime)}
+                    onChange={e=>updateSession(i,'endTime',e.target.value)} style={inputStyle}/>
+                </Field>
+                <button onClick={()=>removeSession(i)}
+                  style={{ background:'none', border:'1.5px solid #fca5a5', borderRadius:6, cursor:'pointer', padding:'0.4rem 0.6rem', color:'#c0392b', marginBottom:1 }}>
+                  <Trash2 size={13}/>
+                </button>
               </div>
-            </Field>
-          )}
+            ))}
+            {editSessions.length === 0 && (
+              <div style={{ fontSize:12, color:'#aaa' }}>No sessions — add one below.</div>
+            )}
+            <button onClick={addSession}
+              style={{ display:'flex', alignItems:'center', gap:5, background:'none', border:'1.5px dashed #bbb', borderRadius:6, padding:'0.4rem 0.75rem', cursor:'pointer', fontSize:12, color:'#666', width:'fit-content' }}>
+              <Plus size={12}/> Add session
+            </button>
+          </div>
+        </SectionCard>
 
+        {/* Location */}
+        <SectionCard title="Location">
           <Field label="Location type">
             <div style={{ display:'flex', gap:6 }}>
               {LOCATION_TYPES.map(lt => (
-                <button key={lt} onClick={()=>set('location_type',lt)}
-                  style={{ padding:'0.35rem 0.75rem', borderRadius:6, border:'1.5px solid', fontSize:12, cursor:'pointer',
-                    borderColor: field('location_type')===lt ? '#3a8c3f' : '#ddd',
-                    background:  field('location_type')===lt ? '#e8f5e9' : 'white',
-                    color:       field('location_type')===lt ? '#2a6b2e' : '#555',
-                    fontWeight:  field('location_type')===lt ? 600 : 400 }}>
+                <ToggleBtn key={lt} active={field('location_type')===lt} onClick={()=>set('location_type',lt)}>
                   {LOCATION_LABELS[lt]}
-                </button>
+                </ToggleBtn>
               ))}
             </div>
           </Field>
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+            <Field label="Place name">
+              <input value={field('place_name')||''} onChange={e=>set('place_name',e.target.value)} style={inputStyle} placeholder="Venue name"/>
+            </Field>
+            <Field label="Room / suite">
+              <input value={field('room_num')||''} onChange={e=>set('room_num',e.target.value)} style={inputStyle} placeholder="Room 101"/>
+            </Field>
+          </div>
 
           {['ph2','bo'].includes(field('location_type')) && (
             <Field label="Address">
@@ -193,26 +301,72 @@ export default function ReviewEventPage() {
               <input value={field('url_link')||''} onChange={e=>set('url_link',e.target.value)} style={inputStyle} placeholder="https://…"/>
             </Field>
           )}
+        </SectionCard>
+
+        {/* Categorization */}
+        <SectionCard title="Categorization">
+          <Field label="Post type categories">
+            <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+              {POST_TYPES.map(({ id: ptId, label }) => {
+                const selected = postTypeIds.includes(ptId);
+                return (
+                  <label key={ptId} style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, padding:'0.3rem 0.65rem', borderRadius:6, border:'1.5px solid', cursor:'pointer',
+                    borderColor: selected ? '#3a8c3f' : '#ddd',
+                    background:  selected ? '#e8f5e9' : 'white',
+                    color:       selected ? '#2a6b2e' : '#555',
+                    fontWeight:  selected ? 600 : 400 }}>
+                    <input type="checkbox" style={{ display:'none' }} checked={selected}
+                      onChange={e => {
+                        const next = e.target.checked
+                          ? [...postTypeIds, ptId]
+                          : postTypeIds.filter((x: number) => x !== ptId);
+                        set('post_type_ids', next);
+                      }}/>
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
+          </Field>
 
           <Field label="Geographic scope">
             <div style={{ display:'flex', gap:6 }}>
               {GEO_SCOPES.map(gs => (
-                <button key={gs} onClick={()=>set('geo_scope',gs)}
-                  style={{ padding:'0.35rem 0.75rem', borderRadius:6, border:'1.5px solid', fontSize:12, cursor:'pointer',
-                    borderColor: field('geo_scope')===gs ? '#3a8c3f' : '#ddd',
-                    background:  field('geo_scope')===gs ? '#e8f5e9' : 'white',
-                    color:       field('geo_scope')===gs ? '#2a6b2e' : '#555',
-                    fontWeight:  field('geo_scope')===gs ? 600 : 400 }}>
+                <ToggleBtn key={gs} active={field('geo_scope')===gs} onClick={()=>set('geo_scope',gs)}>
                   {GEO_LABELS[gs]}
-                </button>
+                </ToggleBtn>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Display">
+            <div style={{ display:'flex', gap:6 }}>
+              {DISPLAY_OPTIONS.map(([val, lbl]) => (
+                <ToggleBtn key={val} active={field('display')===val} onClick={()=>set('display',val)}>{lbl}</ToggleBtn>
               ))}
             </div>
           </Field>
 
           <Field label="Sponsors">
-            <input value={parseJson(field('sponsors')).join(', ')}
-              onChange={e=>set('sponsors',e.target.value.split(',').map((s:string)=>s.trim()).filter(Boolean))}
+            <input value={parseJson(field('sponsors'), []).join(', ')}
+              onChange={e=>set('sponsors', e.target.value.split(',').map((s:string)=>s.trim()).filter(Boolean))}
               style={inputStyle} placeholder="Sponsor 1, Sponsor 2"/>
+          </Field>
+        </SectionCard>
+
+        {/* Contact & Media */}
+        <SectionCard title="Contact & Media">
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
+            <Field label="Contact email">
+              <input value={field('contact_email')||''} onChange={e=>set('contact_email',e.target.value)} style={inputStyle}/>
+            </Field>
+            <Field label="Phone">
+              <input value={field('phone')||''} onChange={e=>set('phone',e.target.value)} style={inputStyle}/>
+            </Field>
+          </div>
+
+          <Field label="Website">
+            <input value={field('website')||''} onChange={e=>set('website',e.target.value)} style={inputStyle} placeholder="https://…"/>
           </Field>
 
           <Field label="Image URL">
@@ -221,13 +375,43 @@ export default function ReviewEventPage() {
               <img src={field('image_cdn_url')} alt="preview" style={{ marginTop:8, maxHeight:120, borderRadius:6, objectFit:'cover' }}/>
             )}
           </Field>
+        </SectionCard>
 
+        {/* Buttons / Links */}
+        <SectionCard title="Buttons / Links">
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {editButtons.map((btn, i) => (
+              <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 2fr auto', gap:8, alignItems:'flex-end' }}>
+                <Field label={i === 0 ? 'Label' : ''}>
+                  <input value={btn.title} onChange={e=>updateButton(i,'title',e.target.value)} style={inputStyle} placeholder="Get Tickets"/>
+                </Field>
+                <Field label={i === 0 ? 'URL' : ''}>
+                  <input value={btn.link} onChange={e=>updateButton(i,'link',e.target.value)} style={inputStyle} placeholder="https://…"/>
+                </Field>
+                <button onClick={()=>removeButton(i)}
+                  style={{ background:'none', border:'1.5px solid #fca5a5', borderRadius:6, cursor:'pointer', padding:'0.4rem 0.6rem', color:'#c0392b', marginBottom:1 }}>
+                  <Trash2 size={13}/>
+                </button>
+              </div>
+            ))}
+            {editButtons.length === 0 && (
+              <div style={{ fontSize:12, color:'#aaa' }}>No buttons.</div>
+            )}
+            <button onClick={addButton}
+              style={{ display:'flex', alignItems:'center', gap:5, background:'none', border:'1.5px dashed #bbb', borderRadius:6, padding:'0.4rem 0.75rem', cursor:'pointer', fontSize:12, color:'#666', width:'fit-content' }}>
+              <Plus size={12}/> Add button
+            </button>
+          </div>
+        </SectionCard>
+
+        {/* Source */}
+        <SectionCard title="Source">
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem' }}>
-            <Field label="Contact email">
-              <input value={field('contact_email')||''} onChange={e=>set('contact_email',e.target.value)} style={inputStyle}/>
+            <Field label="Source name">
+              <input value={field('calendar_source_name')||''} onChange={e=>set('calendar_source_name',e.target.value)} style={inputStyle}/>
             </Field>
-            <Field label="Phone">
-              <input value={field('phone')||''} onChange={e=>set('phone',e.target.value)} style={inputStyle}/>
+            <Field label="Source URL">
+              <input value={field('calendar_source_url')||''} onChange={e=>set('calendar_source_url',e.target.value)} style={inputStyle} placeholder="https://…"/>
             </Field>
           </div>
 
@@ -239,7 +423,7 @@ export default function ReviewEventPage() {
               </a>
             </Field>
           )}
-        </div>
+        </SectionCard>
       </main>
 
       {showReject && (
@@ -271,12 +455,36 @@ export default function ReviewEventPage() {
   );
 }
 
-function Field({ label, children }: { label:string; children:React.ReactNode }) {
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label style={{ fontSize:11, fontWeight:600, color:'#888', textTransform:'uppercase', letterSpacing:0.5, display:'block', marginBottom:4 }}>{label}</label>
+    <div className="card" style={{ display:'flex', flexDirection:'column', gap:'1rem', marginBottom:'1rem' }}>
+      <div style={{ fontSize:11, fontWeight:700, color:'#aaa', textTransform:'uppercase', letterSpacing:1, borderBottom:'1px solid #f0f0f0', paddingBottom:'0.5rem' }}>
+        {title}
+      </div>
       {children}
     </div>
+  );
+}
+
+function Field({ label, children }: { label?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      {label && <label style={{ fontSize:11, fontWeight:600, color:'#888', textTransform:'uppercase', letterSpacing:0.5, display:'block', marginBottom:4 }}>{label}</label>}
+      {children}
+    </div>
+  );
+}
+
+function ToggleBtn({ active, onClick, children }: { active: boolean; onClick: ()=>void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick}
+      style={{ padding:'0.35rem 0.75rem', borderRadius:6, border:'1.5px solid', fontSize:12, cursor:'pointer',
+        borderColor: active ? '#3a8c3f' : '#ddd',
+        background:  active ? '#e8f5e9' : 'white',
+        color:       active ? '#2a6b2e' : '#555',
+        fontWeight:  active ? 600 : 400 }}>
+      {children}
+    </button>
   );
 }
 
