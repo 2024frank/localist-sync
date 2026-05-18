@@ -101,11 +101,12 @@ export default function SourcesPage() {
     setTriggering(sourceId);
     try {
       const res  = await fetch(`/api/agent/trigger/${sourceId}`, { method: 'POST', headers: h() });
-      const data = await res.json();
+      let data: any = {};
+      try { data = await res.json(); } catch {}
       if (!res.ok) {
         showToast(`Error: ${data.error || 'Failed to start run'}`);
       } else {
-        showToast(`Agent started for ${data.source} — fetching events…`);
+        showToast(`Agent started for ${data.source || 'source'} — fetching events…`);
         setTimeout(loadRuns, 1000);
       }
     } catch (err: any) {
