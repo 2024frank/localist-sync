@@ -460,7 +460,7 @@ describe('Stage 3 – Next agent run injects rejection history into agent messag
       .mockResolvedValueOnce([SOURCE_1_REJECTIONS])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const msg1 = mockAgentCreate.mock.calls[0][0].messages[0].content as string;
 
     // Run source 2
@@ -470,7 +470,7 @@ describe('Stage 3 – Next agent run injects rejection history into agent messag
       .mockResolvedValueOnce([SOURCE_2_REJECTIONS])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-    await triggerAgentRun(2);
+    await triggerAgentRun(2, 99, 'test-key', 'test-env');
     const msg2 = mockAgentCreate.mock.calls[1][0].messages[0].content as string;
 
     // Source 1's agent sees its own history

@@ -189,20 +189,20 @@ describe('Scenario 1 – Agent run writes events with schema-correct structure',
   });
 
   it('calls the agent with the registered source agent_id', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(mockAgentCreate).toHaveBeenCalledWith(expect.objectContaining({
       agent_id: SOURCE.agent_id,
     }));
   });
 
   it('writes one raw_events row per extracted event', async () => {
-    const result = await triggerAgentRun(1);
+    const result = await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(result.inserted).toBe(2);
     expect(result.events).toHaveLength(2);
   });
 
   it('inserts title, description, and sponsors from agent output', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const insertCall = db.mockConn.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('INSERT INTO raw_events')
     );
@@ -213,7 +213,7 @@ describe('Scenario 1 – Agent run writes events with schema-correct structure',
   });
 
   it('JSON-stringifies array fields (sponsors, sessions, post_type_ids)', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const insertCall = db.mockConn.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('INSERT INTO raw_events')
     );
@@ -226,7 +226,7 @@ describe('Scenario 1 – Agent run writes events with schema-correct structure',
   });
 
   it('sets status to "pending" for all new events', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const insertCalls = db.mockConn.query.mock.calls.filter(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('INSERT INTO raw_events')
     );
@@ -237,7 +237,7 @@ describe('Scenario 1 – Agent run writes events with schema-correct structure',
   });
 
   it('writes ingestedPostUrl = APP_URL/events/{insertId}', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const urlUpdateCalls = db.mockConn.query.mock.calls.filter(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('ingested_post_url')
     );
@@ -247,7 +247,7 @@ describe('Scenario 1 – Agent run writes events with schema-correct structure',
   });
 
   it('updates agent_run with events_found=2 and events_extracted=2', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const finalUpdate = db.default.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('events_found')
     );
@@ -255,7 +255,7 @@ describe('Scenario 1 – Agent run writes events with schema-correct structure',
   });
 
   it('returns event list containing id and ingestedPostUrl for each event', async () => {
-    const result = await triggerAgentRun(1);
+    const result = await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(result.events[0]).toMatchObject({
       id:                10,
       title:             'Jazz Ensemble Concert',

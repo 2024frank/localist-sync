@@ -8,7 +8,7 @@ function getResend(): Resend {
 }
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-const FROM    = 'AI Calendar <notifications@ai-calendar.oberlin.edu>';
+const FROM    = 'AI Calendar <support@uhurued.com>';
 
 export async function sendReviewNotification(opts: {
   reviewerEmail: string;

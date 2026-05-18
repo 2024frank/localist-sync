@@ -24,7 +24,10 @@ export async function POST(
 
   const [[event]] = await pool.query('SELECT * FROM raw_events WHERE id = ?', [eventId]) as any;
   if (!event) return Response.json({ error: 'Not found' }, { status: 404 });
-  if (event.status !== 'pending') return Response.json({ error: 'Already reviewed' }, { status: 409 });
+  // Allow resubmission of rejected events (approve action only)
+  if (event.status !== 'pending' && !(event.status === 'rejected' && action === 'approve')) {
+    return Response.json({ error: 'Already reviewed' }, { status: 409 });
+  }
 
   const [[dbUser]] = await pool.query('SELECT id FROM users WHERE firebase_uid = ?', [user.uid]) as any;
   const reviewerId = dbUser?.id;

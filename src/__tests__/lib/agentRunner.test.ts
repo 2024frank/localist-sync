@@ -93,7 +93,7 @@ describe('triggerAgentRun — happy path', () => {
   });
 
   it('returns run_id, inserted count, and event list', async () => {
-    const result = await triggerAgentRun(1);
+    const result = await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(result.run_id).toBe(99);
     expect(result.inserted).toBe(1);
     expect(result.events).toHaveLength(1);
@@ -101,7 +101,7 @@ describe('triggerAgentRun — happy path', () => {
   });
 
   it('passes agent_id, environment_id, vault_id to Anthropic', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
       agent_id:       SOURCE.agent_id,
       environment_id: process.env.SOURCE_BUILDER_ENVIRONMENT_ID,
@@ -110,7 +110,7 @@ describe('triggerAgentRun — happy path', () => {
   });
 
   it('builds ingestedPostUrl using APP_URL and inserted row id', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const updateCall = db.mockConn.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('ingested_post_url')
     );
@@ -119,7 +119,7 @@ describe('triggerAgentRun — happy path', () => {
   });
 
   it('updates agent_run with events_found and events_extracted', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const updateCall = db.default.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('events_found')
     );
@@ -132,33 +132,33 @@ describe('triggerAgentRun — happy path', () => {
       count: 3,
       prompt_block: '## Rejection history\n- "Old Event" → REJECTED: wrong_audience',
     });
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const msg = mockCreate.mock.calls[0][0].messages[0].content;
     expect(msg).toContain('Rejection history');
     expect(msg).toContain('Old Event');
   });
 
   it('sends plain message when no rejection history', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     const msg = mockCreate.mock.calls[0][0].messages[0].content;
     expect(msg).toContain('Run extraction now');
     expect(msg).not.toContain('Rejection history');
   });
 
   it('queries rejection history with correct sourceId and limit=50', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(mockGetHistory).toHaveBeenCalledWith(1, 50);
   });
 
   it('wraps writeEvents in a transaction (beginTransaction + commit)', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(db.mockConn.beginTransaction).toHaveBeenCalledTimes(1);
     expect(db.mockConn.commit).toHaveBeenCalledTimes(1);
     expect(db.mockConn.rollback).not.toHaveBeenCalled();
   });
 
   it('releases the DB connection after success', async () => {
-    await triggerAgentRun(1);
+    await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(db.mockConn.release).toHaveBeenCalledTimes(1);
   });
 });
@@ -189,7 +189,7 @@ describe('triggerAgentRun — multiple events', () => {
 
     mockCreate.mockResolvedValue(makeAgentResult(events));
 
-    const result = await triggerAgentRun(1);
+    const result = await triggerAgentRun(1, 99, 'test-key', 'test-env');
     expect(result.inserted).toBe(3);
     expect(result.events).toHaveLength(3);
     // Exactly one transaction for all inserts — not one per event
@@ -204,7 +204,7 @@ describe('triggerAgentRun — multiple events', () => {
 describe('triggerAgentRun — source validation', () => {
   it('throws when source not found', async () => {
     db.default.query.mockResolvedValueOnce([[]]); // empty result
-    await expect(triggerAgentRun(999)).rejects.toThrow('Source 999 not found or inactive');
+    await expect(triggerAgentRun(999, 99, 'test-key', 'test-env')).rejects.toThrow('Source 999 not found or inactive');
   });
 });
 
@@ -222,7 +222,7 @@ describe('triggerAgentRun — agent failures', () => {
   it('marks run as failed when agent returns non-completed status', async () => {
     mockCreate.mockResolvedValue({ id: 'run_xyz', status: 'failed' });
 
-    await expect(triggerAgentRun(1)).rejects.toThrow('Agent run ended with status: failed');
+    await expect(triggerAgentRun(1, 99, 'test-key', 'test-env')).rejects.toThrow('Agent run ended with status: failed');
 
     const failUpdate = db.default.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes("status='failed'")
@@ -236,7 +236,7 @@ describe('triggerAgentRun — agent failures', () => {
       output_messages: [{ role: 'assistant', content: 'Sorry, could not find events.' }],
     });
 
-    await expect(triggerAgentRun(1)).rejects.toThrow('Agent returned no JSON array');
+    await expect(triggerAgentRun(1, 99, 'test-key', 'test-env')).rejects.toThrow('Agent returned no JSON array');
 
     const failUpdate = db.default.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes("status='failed'")
@@ -247,7 +247,7 @@ describe('triggerAgentRun — agent failures', () => {
   it('marks run as failed when Anthropic SDK throws', async () => {
     mockCreate.mockRejectedValue(new Error('Rate limited'));
 
-    await expect(triggerAgentRun(1)).rejects.toThrow('Rate limited');
+    await expect(triggerAgentRun(1, 99, 'test-key', 'test-env')).rejects.toThrow('Rate limited');
 
     const failUpdate = db.default.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes("status='failed'")
@@ -258,7 +258,7 @@ describe('triggerAgentRun — agent failures', () => {
   it('stores error message in error_log JSON column', async () => {
     mockCreate.mockRejectedValue(new Error('Connection timeout'));
 
-    await expect(triggerAgentRun(1)).rejects.toThrow();
+    await expect(triggerAgentRun(1, 99, 'test-key', 'test-env')).rejects.toThrow();
 
     const failUpdate = db.default.query.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && c[0].includes('error_log')
@@ -284,7 +284,7 @@ describe('triggerAgentRun — DB write failure', () => {
     db.mockConn.query.mockReset();
     db.mockConn.query.mockRejectedValueOnce(new Error('Deadlock found'));
 
-    await expect(triggerAgentRun(1)).rejects.toThrow();
+    await expect(triggerAgentRun(1, 99, 'test-key', 'test-env')).rejects.toThrow();
     expect(db.mockConn.rollback).toHaveBeenCalledTimes(1);
     expect(db.mockConn.release).toHaveBeenCalledTimes(1);
   });
