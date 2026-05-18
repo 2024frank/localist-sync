@@ -62,11 +62,11 @@ export default function SourcesPage() {
 
   async function addSource() {
     setAdding(true); setError('');
+    const controller = new AbortController();
+    const tid = setTimeout(() => { controller.abort(); setAdding(false); setError('Request timed out — please try again'); }, 12000);
     let res: Response;
     try {
       const freshToken = await getFreshToken();
-      const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 8000);
       res = await fetch('/api/sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${freshToken}` },
@@ -75,8 +75,11 @@ export default function SourcesPage() {
       });
       clearTimeout(tid);
     } catch (err: any) {
-      setError(err.name === 'AbortError' ? 'Request timed out — check Vercel logs' : `Error: ${err.message}`);
-      setAdding(false);
+      clearTimeout(tid);
+      if (err.name !== 'AbortError') {
+        setError(`Error: ${err.message}`);
+        setAdding(false);
+      }
       return;
     }
     const data = await res.json();

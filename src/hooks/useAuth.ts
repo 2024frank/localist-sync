@@ -72,7 +72,7 @@ export function useAuth(requiredRole?: 'admin' | 'reviewer') {
     const auth = getAuth();
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return token;
-    const fresh = await firebaseUser.getIdToken(true); // force refresh
+    const fresh = await firebaseUser.getIdToken(); // use cached, refreshed automatically by onIdTokenChanged
     localStorage.setItem('token', fresh);
     setToken(fresh);
     return fresh;
