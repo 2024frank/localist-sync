@@ -129,11 +129,18 @@ export async function POST(
     (conn as any).release();
   }
 
-  // Mark run complete
+  // Mark this run complete
   await pool.query(
     `UPDATE agent_runs SET status='completed', finished_at=NOW(),
      events_found=?, events_extracted=? WHERE id=?`,
     [agentCount, inserted, runId]
+  );
+
+  // Close any other stale running sessions for this source (agent is done)
+  await pool.query(
+    `UPDATE agent_runs SET status='completed', finished_at=NOW()
+     WHERE source_id=? AND status='running' AND id != ?`,
+    [source.id, runId]
   );
 
   console.log(`[ingest] source=${source.name} slug=${slug} run=${runId} inserted=${inserted}`);
