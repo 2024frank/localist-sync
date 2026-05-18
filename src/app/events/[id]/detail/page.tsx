@@ -93,12 +93,18 @@ export default function EventDetailPage() {
     if (Array.isArray(val)) return val;
     try { return JSON.parse(val); } catch { return []; }
   }
+  // Use local browser time for display — what you type is what gets saved
+  // The unix timestamp sent to CommunityHub is always timezone-correct
   function toLocal(unix: number) {
+    if (!unix) return '';
     const d = new Date(unix * 1000);
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
-  function fromLocal(str: string) { return Math.floor(new Date(str).getTime() / 1000); }
+  function fromLocal(str: string) {
+    if (!str) return 0;
+    return Math.floor(new Date(str).getTime() / 1000);
+  }
 
   if (!ready || !user || !event) return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -287,13 +293,39 @@ export default function EventDetailPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Field label="Contact email">
                 <input value={field('contact_email') || ''} onChange={e => set('contact_email', e.target.value)}
-                  disabled={!canEdit} style={inputStyle}/>
+                  disabled={!canEdit} style={inputStyle} placeholder="contact@example.com"/>
               </Field>
               <Field label="Phone">
                 <input value={field('phone') || ''} onChange={e => set('phone', e.target.value)}
-                  disabled={!canEdit} style={inputStyle}/>
+                  disabled={!canEdit} style={inputStyle} placeholder="(440) 000-0000"/>
               </Field>
             </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <Field label="Website">
+                <input value={field('website') || ''} onChange={e => set('website', e.target.value)}
+                  disabled={!canEdit} style={inputStyle} placeholder="https://…"/>
+              </Field>
+              <Field label="Room / venue detail">
+                <input value={field('room_num') || ''} onChange={e => set('room_num', e.target.value)}
+                  disabled={!canEdit} style={inputStyle} placeholder="e.g. Heiser Auditorium"/>
+              </Field>
+            </div>
+
+            <Field label="Place name">
+              <input value={field('place_name') || ''} onChange={e => set('place_name', e.target.value)}
+                disabled={!canEdit} style={inputStyle} placeholder="e.g. Apollo Theatre"/>
+            </Field>
+
+            <Field label="Event URL / tickets">
+              <input value={field('url_link') || ''} onChange={e => set('url_link', e.target.value)}
+                disabled={!canEdit} style={inputStyle} placeholder="https://…"/>
+            </Field>
+
+            <Field label="Calendar source name">
+              <input value={field('calendar_source_name') || ''} onChange={e => set('calendar_source_name', e.target.value)}
+                disabled={!canEdit} style={inputStyle}/>
+            </Field>
 
             <Field label="Image URL">
               <input value={field('image_cdn_url') || ''} onChange={e => set('image_cdn_url', e.target.value)}

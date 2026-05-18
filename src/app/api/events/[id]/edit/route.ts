@@ -37,7 +37,7 @@ export async function POST(
     'title', 'description', 'extended_description', 'sessions',
     'location_type', 'location', 'place_name', 'room_num', 'url_link',
     'sponsors', 'post_type_ids', 'geo_scope', 'contact_email',
-    'phone', 'website', 'image_cdn_url', 'buttons', 'display',
+    'phone', 'website', 'image_cdn_url', 'buttons', 'display', 'calendar_source_name', 'calendar_source_url',
   ];
 
   const changedFields: string[] = [];
