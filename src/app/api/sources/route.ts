@@ -6,17 +6,33 @@ export async function GET(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return unauthorized();
 
+  // Simple query — no subqueries that could fail on missing data
   const [rows] = await pool.query(
-    `SELECT s.*,
-       (SELECT COUNT(*) FROM raw_events WHERE source_id = s.id)               AS total_events,
-       (SELECT SUM(status='approved') FROM raw_events WHERE source_id = s.id) AS total_approved,
-       (SELECT MAX(finished_at) FROM agent_runs WHERE source_id = s.id)       AS last_run_at,
-       (SELECT status FROM agent_runs WHERE source_id = s.id
-        ORDER BY started_at DESC LIMIT 1)                                      AS last_run_status
-     FROM sources s ORDER BY s.name ASC`
+    'SELECT * FROM sources ORDER BY name ASC'
   ) as any;
 
-  return Response.json(rows);
+  // Enrich with stats separately so one failure doesn't break the whole list
+  const enriched = await Promise.all(rows.map(async (s: any) => {
+    try {
+      const [[counts]] = await pool.query(
+        `SELECT
+           COUNT(*) AS total_events,
+           SUM(status='approved') AS total_approved
+         FROM raw_events WHERE source_id = ?`,
+        [s.id]
+      ) as any;
+      const [[lastRun]] = await pool.query(
+        `SELECT status, finished_at FROM agent_runs
+         WHERE source_id = ? ORDER BY started_at DESC LIMIT 1`,
+        [s.id]
+      ) as any;
+      return { ...s, ...counts, last_run_status: lastRun?.status || null, last_run_at: lastRun?.finished_at || null };
+    } catch {
+      return { ...s, total_events: 0, total_approved: 0, last_run_status: null, last_run_at: null };
+    }
+  }));
+
+  return Response.json(enriched);
 }
 
 export async function POST(req: NextRequest) {
@@ -51,14 +67,13 @@ export async function POST(req: NextRequest) {
   const sourceId = result.insertId;
   const [[created]] = await pool.query('SELECT * FROM sources WHERE id = ?', [sourceId]) as any;
 
-  // Kick off first fetch via a separate HTTP call — truly non-blocking on Vercel
-  // We don't await this — the source is already saved, return immediately
+  // Fire first fetch — truly non-blocking
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
   const token  = req.headers.get('authorization') || '';
   fetch(`${appUrl}/api/agent/trigger/${sourceId}`, {
     method: 'POST',
     headers: { Authorization: token },
-  }).catch(() => {}); // fire and forget
+  }).catch(() => {});
 
   return Response.json({ ...created, initial_fetch: 'triggered' }, { status: 201 });
 }
