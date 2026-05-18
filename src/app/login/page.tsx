@@ -61,7 +61,7 @@ export default function LoginPage() {
         <div style={{ marginBottom: '1.25rem' }}>
           <Image
             src="/logo.png"
-            alt="AI Events Aggregator"
+            alt="AI Events Ingestion Software"
             width={80}
             height={80}
             priority
@@ -69,7 +69,7 @@ export default function LoginPage() {
         </div>
 
         <div style={{ fontSize: 20, fontWeight: 800, color: '#3a8c3f', letterSpacing: 0.5, marginBottom: 2 }}>
-          AI EVENTS AGGREGATOR
+          AI EVENTS INGESTION SOFTWARE
         </div>
         <div style={{ fontSize: 12, color: '#aaa', marginBottom: '2rem' }}>
           CommunityHub

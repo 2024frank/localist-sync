@@ -1,6 +1,6 @@
-# AI Community Calendar Aggregator
+# AI Events Ingestion Software
 
-An open-source, AI-powered event aggregation and human review platform for community organizations. Autonomous Claude agents scrape event calendars, extract structured data, and surface it to a review team who approve, edit, reject, or send events back to the AI for correction — before anything reaches the public.
+An open-source, AI-powered event ingestion and human review platform for community organizations. Autonomous Claude agents scrape event calendars, extract structured data, and surface it to a review team who approve, edit, reject, or send events back to the AI for correction — before anything reaches the public.
 
 Built for the **Oberlin Environmental Dashboard** as part of the Oberlin College AI Micro-Grant Program. Fully configurable for any community.
 

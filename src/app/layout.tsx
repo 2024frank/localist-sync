@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AI Events Aggregator',
-  description: 'Oberlin Environmental Dashboard — AI-powered community calendar',
+  title: 'AI Events Ingestion Software',
+  description: 'AI Events Ingestion Software — AI-powered event ingestion and review platform',
   icons: {
     icon: '/logo.png',
     apple: '/logo.png',

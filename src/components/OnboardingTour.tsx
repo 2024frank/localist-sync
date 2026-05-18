@@ -11,7 +11,7 @@ interface Step {
 const ADMIN_STEPS: Step[] = [
   {
     title: 'Welcome, Admin',
-    body:  'This is your AI Calendar control centre. You have full visibility over every agent, every event, and every reviewer. This tour takes about 60 seconds.',
+    body:  'This is your AI Events Ingestion Software control centre. You have full visibility over every agent, every event, and every reviewer. This tour takes about 60 seconds.',
     icon: (
       <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
         <circle cx="32" cy="32" r="30" fill="#e8f5e9"/>
@@ -98,7 +98,7 @@ const ADMIN_STEPS: Step[] = [
 
 const REVIEWER_STEPS: Step[] = [
   {
-    title: 'Welcome to AI Calendar',
+    title: 'Welcome to AI Events Ingestion Software',
     body:  'AI agents automatically pull events from multiple sources and bring them here for your review before they go live. This tour takes about 60 seconds.',
     icon: (
       <svg width="64" height="64" viewBox="0 0 64 64" fill="none">

@@ -8,7 +8,7 @@ function getResend(): Resend {
 }
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-const FROM    = 'AI Calendar <support@uhurued.com>';
+const FROM    = 'AI Events Ingestion Software <support@uhurued.com>';
 
 export async function sendReviewNotification(opts: {
   reviewerEmail: string;
@@ -36,8 +36,8 @@ export async function sendReviewNotification(opts: {
 <tr><td align="center">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(58,140,63,0.1);">
 <tr><td style="background:#3a8c3f;padding:28px 32px;text-align:center;">
-  <h1 style="color:white;margin:0 0 4px;font-size:20px;font-weight:800;letter-spacing:0.5px;">AI CALENDAR AGGREGATOR</h1>
-  <p style="color:rgba(255,255,255,0.8);margin:0;font-size:13px;">Oberlin Environmental Dashboard</p>
+  <h1 style="color:white;margin:0 0 4px;font-size:20px;font-weight:800;letter-spacing:0.5px;">AI EVENTS INGESTION SOFTWARE</h1>
+  <p style="color:rgba(255,255,255,0.8);margin:0;font-size:13px;">CommunityHub</p>
 </td></tr>
 <tr><td style="padding:32px;">
   <p style="margin:0 0 8px;font-size:15px;color:#333;">Hi ${reviewerName},</p>
@@ -57,7 +57,7 @@ export async function sendReviewNotification(opts: {
   </div>
 </td></tr>
 <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #eee;">
-  <p style="margin:0;font-size:11px;color:#aaa;text-align:center;">AI Community Calendar Aggregator · Oberlin Environmental Dashboard</p>
+  <p style="margin:0;font-size:11px;color:#aaa;text-align:center;">AI Events Ingestion Software · CommunityHub</p>
 </td></tr>
 </table>
 </td></tr>
@@ -109,13 +109,13 @@ export async function sendWelcomeEmail(opts: { email: string; name: string; role
 <tr><td align="center">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(58,140,63,0.1);">
 <tr><td style="background:#3a8c3f;padding:28px 32px;text-align:center;">
-  <h1 style="color:white;margin:0 0 4px;font-size:20px;font-weight:800;letter-spacing:0.5px;">AI CALENDAR AGGREGATOR</h1>
-  <p style="color:rgba(255,255,255,0.8);margin:0;font-size:13px;">Oberlin Environmental Dashboard</p>
+  <h1 style="color:white;margin:0 0 4px;font-size:20px;font-weight:800;letter-spacing:0.5px;">AI EVENTS INGESTION SOFTWARE</h1>
+  <p style="color:rgba(255,255,255,0.8);margin:0;font-size:13px;">CommunityHub</p>
 </td></tr>
 <tr><td style="padding:32px;">
   <p style="margin:0 0 8px;font-size:16px;color:#333;font-weight:600;">Hi ${name},</p>
   <p style="margin:0 0 16px;font-size:14px;color:#666;line-height:1.6;">
-    You've been added as a <strong style="color:#3a8c3f;">${role}</strong> on the AI Calendar Aggregator.
+    You've been added as a <strong style="color:#3a8c3f;">${role}</strong> on AI Events Ingestion Software.
     Sign in with Google to get started.
   </p>
   ${queueSection}
@@ -141,7 +141,7 @@ export async function sendWelcomeEmail(opts: { email: string; name: string; role
   ${actions}
 </td></tr>
 <tr><td style="background:#f8f9fa;padding:16px 32px;border-top:1px solid #eee;">
-  <p style="margin:0;font-size:11px;color:#aaa;text-align:center;">AI Community Calendar Aggregator · Oberlin Environmental Dashboard</p>
+  <p style="margin:0;font-size:11px;color:#aaa;text-align:center;">AI Events Ingestion Software · CommunityHub</p>
 </td></tr>
 </table>
 </td></tr>
@@ -153,7 +153,7 @@ export async function sendWelcomeEmail(opts: { email: string; name: string; role
     to:      email,
     subject: pendingCount > 0
       ? `You're in — ${pendingCount} event${pendingCount !== 1 ? 's' : ''} waiting for your review`
-      : `You've been added to AI Calendar as a ${role}`,
+      : `You've been added to AI Events Ingestion Software as a ${role}`,
     html,
   });
 }

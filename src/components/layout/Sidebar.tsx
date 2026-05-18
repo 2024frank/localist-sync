@@ -101,11 +101,11 @@ export default function Sidebar({ role, name, email, token }: SidebarProps) {
         gap: collapsed ? 0 : 10, flexShrink: 0,
         justifyContent: collapsed ? 'center' : 'flex-start',
       }}>
-        <Image src="/logo.png" alt="AI Events Aggregator" width={32} height={32} style={{ borderRadius: 4, flexShrink: 0 }}/>
+        <Image src="/logo.png" alt="AI Events Ingestion Software" width={32} height={32} style={{ borderRadius: 4, flexShrink: 0 }}/>
         {!collapsed && (
           <div>
             <div style={{ fontSize: 10, fontWeight: 800, color: '#3a8c3f', letterSpacing: 0.8, lineHeight: 1.35, whiteSpace: 'nowrap' }}>AI EVENTS</div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#3a8c3f', letterSpacing: 0.8, lineHeight: 1.35, whiteSpace: 'nowrap' }}>AGGREGATOR</div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#3a8c3f', letterSpacing: 0.8, lineHeight: 1.35, whiteSpace: 'nowrap' }}>INGESTION</div>
             <div style={{ fontSize: 9, color: '#bbb', marginTop: 1 }}>CommunityHub</div>
           </div>
         )}
