@@ -208,6 +208,16 @@ export async function POST(
     const [reviewers] = await pool.query(
       `SELECT id, email, full_name FROM users WHERE active = 1`
     ) as any;
+    // Pending count broken down by source
+    const [pendingBySource] = await pool.query(
+      `SELECT s.name, COUNT(*) AS pending
+       FROM raw_events re JOIN sources s ON s.id = re.source_id
+       WHERE re.status IN ('pending','pending_fix')
+       GROUP BY s.id, s.name`
+    ) as any;
+    const pendingMap: Record<string, number> = {};
+    for (const row of pendingBySource as any[]) pendingMap[row.name] = Number(row.pending);
+
     // Build event preview from the events we just inserted (first 5 titles)
     const previewEvents = events.slice(0, 5).map((ev: any) => ({
       title:  String(ev.title || 'Untitled').slice(0, 80),
@@ -218,7 +228,7 @@ export async function POST(
         reviewerEmail: u.email,
         reviewerName:  u.full_name,
         pendingCount:  pending,
-        sources:       [{ name: source.name, count: inserted }],
+        sources:       [{ name: source.name, count: inserted, pending: pendingMap[source.name] ?? inserted }],
         oldestDate:    null,
         previewEvents,
       }).catch((err: Error) => console.error(`[ingest] email failed for ${u.email}:`, err.message));

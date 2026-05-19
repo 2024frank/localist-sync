@@ -59,13 +59,25 @@ describe('Email templates', () => {
     const { sendReviewNotification } = require('@/lib/email');
     await sendReviewNotification({
       reviewerEmail: 'r@o.edu', reviewerName: 'Jane',
-      pendingCount: 12, sources: [{ name: 'Apollo', count: 12 }], oldestDate: null,
+      pendingCount: 12, sources: [{ name: 'Apollo', count: 3, pending: 12 }], oldestDate: null,
     });
     const html = mockSend.mock.calls[0][0].html;
-    expect(html).toContain('12');
     expect(html).toContain('Jane');
     expect(html).toContain('Apollo');
     expect(html).toContain('/reviewer/queue');
+  });
+
+  it('review email shows pending total per source', async () => {
+    const { sendReviewNotification } = require('@/lib/email');
+    await sendReviewNotification({
+      reviewerEmail: 'r@o.edu', reviewerName: 'Jane',
+      pendingCount: 15,
+      sources: [{ name: 'Apollo Theatre', count: 3, pending: 15 }],
+      oldestDate: null,
+    });
+    const html = mockSend.mock.calls[0][0].html;
+    expect(html).toContain('3 new');
+    expect(html).toContain('15 pending total');
   });
 
   it('review email shows event preview titles when provided', async () => {

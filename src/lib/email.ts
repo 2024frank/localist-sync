@@ -14,7 +14,7 @@ export async function sendReviewNotification(opts: {
   reviewerEmail:  string;
   reviewerName:   string;
   pendingCount:   number;
-  sources:        { name: string; count: number }[];
+  sources:        { name: string; count: number; pending?: number }[];
   oldestDate:     string | null;
   previewEvents?: { title: string; source: string }[];
 }) {
@@ -28,11 +28,13 @@ export async function sendReviewNotification(opts: {
     : `from ${sources.length} sources`;
   const subject = `${newCount} new event${newCount !== 1 ? 's' : ''} ${sourcePart} need${newCount === 1 ? 's' : ''} your review`;
 
-  // Source breakdown rows
+  // Source breakdown rows — show "X new / Y pending total" per source
   const sourceRows = sources
     .map(s => `<tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#444;">${s.name}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:right;font-weight:700;color:#3a8c3f;">${s.count} new</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#444;">${s.name}</td>
+      <td style="padding:9px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:right;">
+        <span style="font-weight:700;color:#3a8c3f;">${s.count} new</span>${s.pending != null ? `<span style="color:#aaa;font-size:12px;margin-left:6px;">${s.pending} pending total</span>` : ''}
+      </td>
     </tr>`).join('');
 
   // Event preview rows — show up to 5 titles
@@ -82,7 +84,7 @@ export async function sendReviewNotification(opts: {
 
     ${previewSection}
 
-    ${sources.length > 1 ? `
+    ${sources.length > 0 ? `
     <p style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;">By source</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;overflow:hidden;margin-bottom:20px;">${sourceRows}</table>` : ''}
 
