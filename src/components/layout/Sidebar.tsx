@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, ClipboardList, CheckCircle, XCircle,
   Database, BarChart2, Shield, Settings, LogOut, Eye,
-  RefreshCw, PanelLeftClose, PanelLeftOpen, Bell,
+  RefreshCw, PanelLeftClose, PanelLeftOpen, Bell, Users,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -137,9 +137,10 @@ export default function Sidebar({ role, name, email, token }: SidebarProps) {
           <>
             <div style={{ borderTop: '1px solid #f0f0f0', margin: '0.5rem 0.25rem' }}/>
             {!collapsed && <div style={{ fontSize: 9, fontWeight: 700, color: '#ccc', textTransform: 'uppercase', letterSpacing: 1, padding: '0 0.5rem 0.25rem', whiteSpace: 'nowrap' }}>Admin</div>}
-            <NavItem href="/admin/sources"   icon={<Database size={16}/>}  label="Event Sources"  active={isActive('/admin/sources')}  collapsed={collapsed}/>
-            <NavItem href="/admin/analytics" icon={<BarChart2 size={16}/>} label="AI Analytics"   active={isActive('/admin/analytics')} collapsed={collapsed}/>
-            <NavItem href="/admin/controls"  icon={<Shield size={16}/>}    label="Admin Controls" active={isActive('/admin/controls')}  collapsed={collapsed}/>
+            <NavItem href="/admin/sources"    icon={<Database size={16}/>}  label="Event Sources"     active={isActive('/admin/sources')}    collapsed={collapsed}/>
+            <NavItem href="/admin/reviewers"  icon={<Users size={16}/>}     label="Reviewer History"  active={isActive('/admin/reviewers')}  collapsed={collapsed}/>
+            <NavItem href="/admin/analytics"  icon={<BarChart2 size={16}/>} label="AI Analytics"      active={isActive('/admin/analytics')}  collapsed={collapsed}/>
+            <NavItem href="/admin/controls"   icon={<Shield size={16}/>}    label="Admin Controls"    active={isActive('/admin/controls')}   collapsed={collapsed}/>
           </>
         )}
 
