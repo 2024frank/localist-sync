@@ -92,10 +92,28 @@ export async function POST(
     import('@/lib/agentRunner').then(({ triggerAgentRun }) => {
       triggerAgentRun(FIX_AGENT_SOURCE_ID, runId, anthropicKey, environmentId, fixMessage).catch((err: Error) => {
         console.error(`Fix agent run ${runId} failed:`, err.message);
+        // Revert the event back to 'pending' so reviewers can still act on it
+        pool.query(
+          "UPDATE raw_events SET status='pending', sent_for_correction=0 WHERE id=?",
+          [eventId]
+        );
         pool.query(
           "UPDATE agent_runs SET status='failed', finished_at=NOW(), error_log=? WHERE id=?",
           [JSON.stringify([err.message]), runId]
         );
+        // Notify the reviewer who sent it so they know to handle it manually
+        if (dbUser?.id) {
+          pool.query(
+            `INSERT INTO notifications (user_id, type, title, message, raw_event_id)
+             VALUES (?, 'fix_failed', ?, ?, ?)`,
+            [
+              dbUser.id,
+              `Fix agent failed: ${event.title}`,
+              `The AI could not process your correction request ("${(err.message || '').slice(0, 120)}"). The event has been returned to the queue for manual review.`,
+              eventId,
+            ]
+          ).catch(() => {});
+        }
       });
     });
 
