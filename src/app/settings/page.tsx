@@ -1,9 +1,22 @@
 'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function SettingsPage() {
   const { user, token, ready } = useAuth();
+  const router = useRouter();
+  const [previewAsReviewer, setPreviewAsReviewer] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem('preview_as_reviewer') === '1'
+  );
+
+  function toggleViewMode() {
+    const next = !previewAsReviewer;
+    setPreviewAsReviewer(next);
+    localStorage.setItem('preview_as_reviewer', next ? '1' : '0');
+    router.push(next ? '/reviewer/dashboard' : '/admin/stats');
+  }
   if (!ready || !user) return null;
 
   return (
@@ -32,6 +45,37 @@ export default function SettingsPage() {
             Sign out
           </button>
         </div>
+
+        {user.role === 'admin' && (
+          <div className="card" style={{ marginBottom: '1.25rem' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: '0.25rem' }}>View mode</h3>
+            <p style={{ fontSize: 13, color: '#888', marginBottom: '1rem' }}>
+              Switch to reviewer view to see exactly what your reviewers see.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  {previewAsReviewer ? 'Reviewer view active' : 'Admin view active'}
+                </div>
+                <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>
+                  {previewAsReviewer ? 'You see exactly what reviewers see' : 'You have full admin access'}
+                </div>
+              </div>
+              <button
+                onClick={toggleViewMode}
+                style={{
+                  padding: '0.45rem 1.1rem',
+                  borderRadius: 7,
+                  border: `1.5px solid ${previewAsReviewer ? '#3a8c3f' : '#e0e0e0'}`,
+                  background: previewAsReviewer ? '#e8f5e9' : 'white',
+                  color: previewAsReviewer ? '#2a6b2e' : '#555',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}>
+                {previewAsReviewer ? 'Back to admin' : 'Switch to reviewer'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {user.role === 'admin' && (
           <div className="card">

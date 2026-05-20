@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   LayoutDashboard, ClipboardList, CheckCircle, XCircle,
   Database, BarChart2, Shield, Settings, LogOut, Eye,
-  RefreshCw, PanelLeftClose, PanelLeftOpen, Bell, Users,
+  PanelLeftClose, PanelLeftOpen, Bell, Users,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,7 +20,9 @@ export default function Sidebar({ role, name, email, token }: SidebarProps) {
   const path   = usePathname();
   const router = useRouter();
   const [pendingCount, setPendingCount]           = useState<number | null>(null);
-  const [previewAsReviewer, setPreviewAsReviewer] = useState(false);
+  const [previewAsReviewer, setPreviewAsReviewer] = useState(() =>
+    typeof window !== 'undefined' && localStorage.getItem('preview_as_reviewer') === '1'
+  );
   const [collapsed, setCollapsed]                 = useState(false);
   const [notifications, setNotifications]         = useState<any[]>([]);
   const [unreadCount, setUnreadCount]             = useState(0);
@@ -165,23 +167,6 @@ export default function Sidebar({ role, name, email, token }: SidebarProps) {
           {collapsed ? <PanelLeftOpen size={16}/> : <><PanelLeftClose size={16}/><span style={{ fontSize: 13 }}>Collapse</span></>}
         </button>
       </nav>
-
-      {/* Admin preview toggle — only when expanded */}
-      {role === 'admin' && !collapsed && (
-        <div style={{ padding: '0.5rem 0.625rem', borderTop: '1px solid #f5f5f5', flexShrink: 0 }}>
-          <button onClick={() => setPreviewAsReviewer(p => !p)} style={{
-            width: '100%', padding: '0.4rem 0.75rem', borderRadius: 7,
-            border: `1.5px solid ${previewAsReviewer ? '#ffc107' : '#e0e0e0'}`,
-            background: previewAsReviewer ? '#fff3cd' : 'white',
-            color: previewAsReviewer ? '#856404' : '#888',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            whiteSpace: 'nowrap',
-          }}>
-            {previewAsReviewer ? <><RefreshCw size={11}/> Back to admin</> : <><Eye size={11}/> Preview as reviewer</>}
-          </button>
-        </div>
-      )}
 
       {/* Notification bell */}
       <div ref={notifRef} style={{ padding: collapsed ? '0.5rem 0' : '0.5rem 0.625rem', borderTop: '1px solid #f5f5f5', flexShrink: 0, display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start' }}>
